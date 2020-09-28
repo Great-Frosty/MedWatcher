@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from collections import deque
+import pandas as pd
 
 
 url = r'https://www.thelancet.com/online-first-research'
@@ -12,20 +13,31 @@ soup = BeautifulSoup(r.text, 'lxml')
 
 keywords = ['human', 'oocyte']
 relevant = []
-all_articles = deque(maxlen=800)
+all_articles = pd.DataFrame(columns=['name', 'date published', 'url', 'contents'])
 
 for article in soup.find_all('div', class_='article-details'):
     text_url = article.find(href=re.compile(r'fulltext'))['href']
     full_text_url = f'https://www.thelancet.com{text_url}'
 
-    # article_body = requests.get(full_text_url)
-    # article_soup = BeautifulSoup(article_body.text, 'lxml')
 
+    if full_text_url not in all_articles['url']:
+        article_body = requests.get(full_text_url)
+        print(f'Opening {full_text_url}')
+        article_soup = BeautifulSoup(article_body.text, 'lxml')
 
-    if full_text_url not in all_articles:
-        all_articles.append(full_text_url)
+        article_name = article_soup.h1.text
+        article_date = article_soup.find('span', class_="article-header__publish-date__value").text
 
-print(*all_articles, sep='\n')
+        print(article_date)
+
+#         all_articles['url'] = full_text_url
+
+# print(all_articles['url'])
+
+#     if full_text_url not in all_articles:
+#         all_articles.append(full_text_url)
+
+# print(*all_articles, sep='\n')
 
     # Заходим в каждой статье по кнопке Full-Text HTML, ищем ключевые слова
     # article_body = requests.get(full_text_url)
