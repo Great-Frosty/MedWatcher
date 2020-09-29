@@ -75,7 +75,7 @@ def is_non_zero_file(fpath):
     return os.path.isfile(fpath) and os.path.getsize(fpath) > 0
 
 
-if __name__ == "__main__":
+def parse():
 
     # First we try to read DataFrame from storage.
     # If it's empty - we create a new one.
@@ -92,3 +92,7 @@ if __name__ == "__main__":
 
     with open('article_storage.json', 'w') as file:
         existing_articles.to_json(file, orient='columns', date_format=None)
+
+
+if __name__ == "__main__":
+    parse()
