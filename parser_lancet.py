@@ -69,29 +69,29 @@ def parse_article(url):
     return formatted_data
 
 
-def is_non_zero_file(fpath):
-    '''Checks if the specified file exists and is not empty.'''
+# def is_non_zero_file(fpath):
+#     '''Checks if the specified file exists and is not empty.'''
 
-    return os.path.isfile(fpath) and os.path.getsize(fpath) > 0
+#     return os.path.isfile(fpath) and os.path.getsize(fpath) > 0
 
-
+# Probably we don't need this one. check_for_updates can look at all existing
+# ulrs, and parse ones that are not in the database. 
 def parse():
+    pass
 
-    # First we try to read DataFrame from storage.
-    # If it's empty - we create a new one.
-    if is_non_zero_file('article_storage.json'):
-        with open('article_storage.json', 'r') as file:
-            existing_articles = pd.read_json(file, convert_dates=False)
-        print('Storage successfully read!')
-    else:
-        print('Article storage is empty.')
-        columns = ['name', 'date', 'url', 'contents']
-        existing_articles = pd.DataFrame(columns=columns)
+    # if is_non_zero_file('article_storage.json'):
+    #     with open('article_storage.json', 'r') as file:
+    #         existing_articles = pd.read_json(file, convert_dates=False)
+    #     print('Storage successfully read!')
+    # else:
+    #     print('Article storage is empty.')
+    #     columns = ['name', 'date', 'url', 'contents']
+    #     existing_articles = pd.DataFrame(columns=columns)
 
-    existing_articles = check_updates(existing_articles)
+    # existing_articles = check_updates(existing_articles)
 
-    with open('article_storage.json', 'w') as file:
-        existing_articles.to_json(file, orient='columns', date_format=None)
+    # with open('article_storage.json', 'w') as file:
+    #     existing_articles.to_json(file, orient='columns', date_format=None)
 
 
 if __name__ == "__main__":
