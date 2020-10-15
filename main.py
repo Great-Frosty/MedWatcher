@@ -40,7 +40,7 @@ def sub(message):
     pass
 
 
-schedule.every(6).hours.do(parser_lancet.check_updates())
+schedule.every(6).hours.do(parser_lancet.check_updates)
 
 if __name__ == "__main__":
     bot.infinity_polling()
