@@ -60,7 +60,7 @@ def parse_article(url):
     # All words are converted to lowercase,
     # words containing numbers are discarded.
     # Again, reasoning is rather self-explanatory.
-    words_filtered = [word.lower() for word in words if word.isalpha()]
+    words_filtered = [word.lower() for word in words if word.isalnum()]
     article_contents = list(set(words_filtered))
 
     formatted_data = (

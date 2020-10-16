@@ -101,6 +101,47 @@ def select_urls(journal):
     return output
 
 
+def set_user_state(user_id, state):
+    '''Changes the state of the user in the database.'''
+
+    conn = sql.connect(config.db_file)
+    conn.execute('''UPDATE user_data
+                    SET state ?
+                    WHERE id = ?''', (state, user_id))
+    conn.commit()
+    conn.close()
+
+
+def get_user_state(user_id):
+    '''Returns user state by id.'''
+
+    conn = sql.connect(config.db_file)
+    conn.execute('''SELECT state
+                    FROM user_data
+                    WHERE id = ?''', (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def set_user_terms(user_id, keywords, op_type, term):
+    '''Inserts user's keywords in the table. Parameter [op_type] should be
+    either 'SEARCH' or 'SUB'. Parameter [term] is either 'JOURNALS' or
+    'KEYWORDS'.'''
+
+    # This clause is needed to use a single function for data insertion.
+    if op_type == 'SEARCH':
+        insertion_column = f'{term.lower()}_searched'
+    elif op_type == 'SUB':
+        insertion_column = f'{term.lower()}_subbed'
+
+    conn = sql.connect(config.db_file)
+    conn.execute('''UPDATE user_data
+                    SET ? = ?
+                    WHERE id = ?''', (insertion_column, keywords, user_id))
+    conn.commit()
+    conn.close()
+
+
 sql.register_adapter(list, adapt_list_to_string)
 sql.register_converter('list', convert_string_to_list)
 
@@ -111,6 +152,16 @@ if __name__ == "__main__":
 
     c.execute('''CREATE TABLE IF NOT EXISTS articles
     (date text, name text, journal text, url text UNIQUE, contents list)''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS user_data
+                            (id text UNIQUE,
+                            journals_searched text,
+                            keywords_searched text,
+                            journals_subbed text,
+                            keywords_subbed text,
+                            days text,
+                            time text,
+                            state text)''')
 
     conn.commit()
     conn.close()
