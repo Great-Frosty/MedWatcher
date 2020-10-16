@@ -106,7 +106,7 @@ def set_user_state(user_id, state):
 
     conn = sql.connect(config.db_file)
     conn.execute('''UPDATE user_data
-                    SET state ?
+                    SET state = ?
                     WHERE id = ?''', (state, user_id))
     conn.commit()
     conn.close()
@@ -116,11 +116,14 @@ def get_user_state(user_id):
     '''Returns user state by id.'''
 
     conn = sql.connect(config.db_file)
-    conn.execute('''SELECT state
+    selected = conn.execute('''SELECT state
                     FROM user_data
                     WHERE id = ?''', (user_id,))
+    state = selected.fetchone()
+    print(f'state = {state}')
     conn.commit()
     conn.close()
+    return state[0]
 
 
 def set_user_terms(user_id, keywords, op_type, term):
@@ -128,19 +131,55 @@ def set_user_terms(user_id, keywords, op_type, term):
     either 'SEARCH' or 'SUB'. Parameter [term] is either 'JOURNALS' or
     'KEYWORDS'.'''
 
-    # This clause is needed to use a single function for data insertion.
+    # This clause is needed to use a single function for several different
+    # data insertion operations.
     if op_type == 'SEARCH':
         insertion_column = f'{term.lower()}_searched'
     elif op_type == 'SUB':
         insertion_column = f'{term.lower()}_subbed'
+    print(insertion_column)
 
     conn = sql.connect(config.db_file)
-    conn.execute('''UPDATE user_data
-                    SET ? = ?
+    conn.execute('''INSERT OR REPLACE INTO user_data(?)
+                    VALUES(?)
                     WHERE id = ?''', (insertion_column, keywords, user_id))
     conn.commit()
     conn.close()
 
+
+def get_user_keywords(user_id, op_type):
+    '''Returns user's keywords.'''
+
+    if op_type == 'SEARCH':
+        selected_column = 'keywords_searched'
+    elif op_type == 'SUB':
+        selected_column = 'keywords_subbed'
+    
+    conn = sql.connect(config.db_file)
+    res = conn.execute('''SELECT ?
+                    FROM user_data
+                    WHERE id = ?''', (selected_column, user_id))
+    keywords = res.fetchone()
+    return keywords
+
+
+def add_user(user_id):
+    '''Adds a new user in the database.'''
+
+    conn = sql.connect(config.db_file)
+    conn.execute('''INSERT INTO user_data
+                    VALUES(?, NULL, NULL, NULL, NULL, NULL, NULL, NULL)''', (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def check_if_user_exists(user_id):
+
+    conn = sql.connect(config.db_file)
+    result = conn.execute('''SELECT id
+                             FROM user_data
+                             WHERE id = ?''', (user_id,))
+    return bool(result.fetchone())
 
 sql.register_adapter(list, adapt_list_to_string)
 sql.register_converter('list', convert_string_to_list)
@@ -165,3 +204,5 @@ if __name__ == "__main__":
 
     conn.commit()
     conn.close()
+
+

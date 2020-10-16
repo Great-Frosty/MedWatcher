@@ -16,7 +16,11 @@ bot = telebot.TeleBot(config.token)
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
 
-    dbworker.set_user_state(message.chat.id, config.States.S_START)
+    if not dbworker.check_if_user_exists(message.chat.id):
+        dbworker.add_user(message.chat.id)
+
+    dbworker.set_user_state(message.chat.id, config.States.S_START.value)
+
     bot.reply_to(message,
                  ('Hi there, I am MedWatcher Bot.\n'
                   'I follow several major medical journals and enjoy spreading'
@@ -46,7 +50,8 @@ def search(message):
                     )
 
     dbworker.set_user_state(message.chat.id, config.States.S_SEARCH.value)
-
+    mes = f'User state is now at {dbworker.get_user_state(message.chat.id)}'
+    bot.send_message(message.chat.id, mes)
 
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH.value
@@ -73,16 +78,20 @@ def get_journals(message):
         message.chat.id,
         config.States.S_SEARCH_JOURNALS.value
     )
-    collected_data = dbworker.select_by_keywords()
-
+    user_keywords = dbworker.get_user_keywords(message.chat.id, 'SEARCH')
+    collected_data = dbworker.select_by_keywords(user_keywords, message.text)
+    bot.send_message(message.chat.id, collected_data)
+    dbworker.set_user_state(
+        message.chat.id, config.States.S_START.value
+    )
 
 # Минутка архитектуры: Бот должен запоминать пользователя, его предыдущие
 # поиски, его предыдущие подписки. В диалоге будет что-то типа 'Welcome back'.
 # Подписаться заново - пришли время, подписаться как раньше - пришли /ок.
 
 
-schedule.every(6).hours.do(parser_lancet.check_updates)
+# schedule.every(6).hours.do(parser_lancet.check_updates)
 
 if __name__ == "__main__":
     bot.infinity_polling()
-    schedule.run_pending()
+
