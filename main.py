@@ -4,6 +4,7 @@ import config
 import schedule
 import dbworker
 import parser_lancet
+import threading
 
 
 logger = telebot.logger
@@ -50,8 +51,6 @@ def search(message):
                     )
 
     dbworker.set_user_state(message.chat.id, config.States.S_SEARCH.value)
-    mes = f'User state is now at {dbworker.get_user_state(message.chat.id)}'
-    bot.send_message(message.chat.id, mes)
 
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH.value
@@ -78,20 +77,32 @@ def get_journals(message):
         message.chat.id,
         config.States.S_SEARCH_JOURNALS.value
     )
-    user_keywords = dbworker.get_user_keywords(message.chat.id, 'SEARCH')
-    collected_data = dbworker.select_by_keywords(user_keywords, message.text)
-    bot.send_message(message.chat.id, collected_data)
-    dbworker.set_user_state(
-        message.chat.id, config.States.S_START.value
-    )
+    user_keywords = dbworker.get_user_keywords(message.chat.id, 'SEARCH').split()
+
+    collected_data = dbworker.select_by_keywords(user_keywords, message.text.split())
+    if not collected_data:
+        bot.send_message(
+            message.chat.id, 'Sorry, i can\'t find what you you\'ve asked.'
+            )
+    else:
+        for row in collected_data:
+            formatted_row = f'{row[0]}.\n<a href="{row[1]}">Read article.</a>'
+            bot.send_message(message.chat.id, formatted_row, parse_mode='html', disable_web_page_preview=False)
+
+        dbworker.set_user_state(
+            message.chat.id, config.States.S_START.value
+        )
 
 # Минутка архитектуры: Бот должен запоминать пользователя, его предыдущие
-# поиски, его предыдущие подписки. В диалоге будет что-то типа 'Welcome back'.
+# поиски и подписки. В диалоге будет что-то типа 'Welcome back'.
 # Подписаться заново - пришли время, подписаться как раньше - пришли /ок.
 
 
 # schedule.every(6).hours.do(parser_lancet.check_updates)
 
 if __name__ == "__main__":
-    bot.infinity_polling()
+
+    polling_thread = threading.Thread(target=bot.infinity_polling)
+    polling_thread.start()
+    parser_lancet.check_updates()
 

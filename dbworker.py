@@ -46,7 +46,7 @@ def select_by_keywords(keywords, journals=['Lancet']):
     c = conn.cursor()
 
     c.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS searchable_contents
-                USING fts4(name, journal, url, contents)''')
+                USING fts5(name, journal, url, contents)''')
 
     c.execute('''INSERT
                  INTO searchable_contents
@@ -56,6 +56,7 @@ def select_by_keywords(keywords, journals=['Lancet']):
     results = c.execute('''SELECT name, url
                        FROM searchable_contents
                        WHERE contents MATCH ?
+                       ORDER BY rank
                        INTERSECT
                        SELECT name, url
                        FROM searchable_contents
@@ -63,7 +64,6 @@ def select_by_keywords(keywords, journals=['Lancet']):
                     ''', (keywords, journals))
 
     output = results.fetchall()
-
     c.execute('''DELETE FROM searchable_contents''')
 
     conn.commit()
@@ -120,7 +120,6 @@ def get_user_state(user_id):
                     FROM user_data
                     WHERE id = ?''', (user_id,))
     state = selected.fetchone()
-    print(f'state = {state}')
     conn.commit()
     conn.close()
     return state[0]
@@ -137,12 +136,12 @@ def set_user_terms(user_id, keywords, op_type, term):
         insertion_column = f'{term.lower()}_searched'
     elif op_type == 'SUB':
         insertion_column = f'{term.lower()}_subbed'
-    print(insertion_column)
 
     conn = sql.connect(config.db_file)
-    conn.execute('''INSERT OR REPLACE INTO user_data(?)
-                    VALUES(?)
-                    WHERE id = ?''', (insertion_column, keywords, user_id))
+    conn.execute('''UPDATE user_data
+                    SET ''' + insertion_column + ''' = ?
+                    WHERE id = ?''', (keywords, user_id))
+
     conn.commit()
     conn.close()
 
@@ -156,19 +155,19 @@ def get_user_keywords(user_id, op_type):
         selected_column = 'keywords_subbed'
     
     conn = sql.connect(config.db_file)
-    res = conn.execute('''SELECT ?
-                    FROM user_data
-                    WHERE id = ?''', (selected_column, user_id))
+    res = conn.execute('''SELECT ''' + selected_column +
+                    ''' FROM user_data
+                    WHERE id = ?''', (user_id, ))
     keywords = res.fetchone()
-    return keywords
+    return keywords[0]
 
 
 def add_user(user_id):
     '''Adds a new user in the database.'''
 
     conn = sql.connect(config.db_file)
-    conn.execute('''INSERT INTO user_data
-                    VALUES(?, NULL, NULL, NULL, NULL, NULL, NULL, NULL)''', (user_id,))
+    conn.execute('''INSERT INTO user_data (id)
+                    VALUES(?)''', (user_id,))
     conn.commit()
     conn.close()
 
@@ -206,3 +205,6 @@ if __name__ == "__main__":
     conn.close()
 
 
+#TODO: reinitialize the database, including /start with the bot
+#TODO: solve search relevance
+#TODO: add scheduling functionality

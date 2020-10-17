@@ -24,9 +24,7 @@ def check_updates(parse_limit=None):
         if full_text_url not in existing_urls:
             data = parse_article(full_text_url)
             dbworker.add_article(data)
-            print(f'successfully added {data[3]} to database!')
-        else:
-            print('We already have this article in storage.')
+            print(f'Added {data[3]} to database!')
 
     return None
 
