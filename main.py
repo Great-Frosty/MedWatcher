@@ -35,9 +35,10 @@ def send_welcome(message):
                   '/subscribe will hook you up.\n'
                   '/help\n might also come in handy, '
                   'but you\'ve probaby figured that one out already...'))
+    # else:
+    #     bot.
 
 
-# We need a scheduling command as soon as possible.
 @bot.message_handler(commands=['subscribe'])
 def subscribe(message):
     bot.send_message(message.chat.id, 'работает!')
@@ -102,7 +103,8 @@ def get_journals(message):
 
 if __name__ == "__main__":
 
-    polling_thread = threading.Thread(target=bot.infinity_polling)
-    polling_thread.start()
-    parser_lancet.check_updates()
+    while True:
+        polling_thread = threading.Thread(target=bot.infinity_polling, daemon=True)
+        polling_thread.start()
+        parser_lancet.check_updates()
 

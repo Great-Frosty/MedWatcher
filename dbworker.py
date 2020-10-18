@@ -54,14 +54,14 @@ def select_by_keywords(keywords, journals=['Lancet']):
                  FROM articles''')
 
     results = c.execute('''SELECT name, url
-                       FROM searchable_contents
-                       WHERE contents MATCH ?
-                       ORDER BY rank
-                       INTERSECT
-                       SELECT name, url
-                       FROM searchable_contents
-                       WHERE journal MATCH ?
-                    ''', (keywords, journals))
+                           FROM
+                           (SELECT name, url, journal
+                            FROM searchable_contents
+                            WHERE contents MATCH ?
+                            ORDER BY bm25(searchable_contents)
+                           )
+                           WHERE journal MATCH ?
+                    ''', (keywords,journals,))
 
     output = results.fetchall()
     c.execute('''DELETE FROM searchable_contents''')
@@ -183,26 +183,26 @@ def check_if_user_exists(user_id):
 sql.register_adapter(list, adapt_list_to_string)
 sql.register_converter('list', convert_string_to_list)
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    conn = sql.connect(config.db_file, detect_types=sql.PARSE_DECLTYPES)
-    c = conn.cursor()
+conn = sql.connect(config.db_file, detect_types=sql.PARSE_DECLTYPES)
+c = conn.cursor()
 
-    c.execute('''CREATE TABLE IF NOT EXISTS articles
-    (date text, name text, journal text, url text UNIQUE, contents list)''')
+c.execute('''CREATE TABLE IF NOT EXISTS articles
+(date text, name text, journal text, url text UNIQUE, contents list)''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS user_data
-                            (id text UNIQUE,
-                            journals_searched text,
-                            keywords_searched text,
-                            journals_subbed text,
-                            keywords_subbed text,
-                            days text,
-                            time text,
-                            state text)''')
+c.execute('''CREATE TABLE IF NOT EXISTS user_data
+                        (id text UNIQUE,
+                        journals_searched text,
+                        keywords_searched text,
+                        journals_subbed text,
+                        keywords_subbed text,
+                        days text,
+                        time text,
+                        state text)''')
 
-    conn.commit()
-    conn.close()
+conn.commit()
+conn.close()
 
 
 #TODO: reinitialize the database, including /start with the bot

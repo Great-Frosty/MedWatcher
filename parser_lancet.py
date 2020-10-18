@@ -59,7 +59,8 @@ def parse_article(url):
     # words containing numbers are discarded.
     # Again, reasoning is rather self-explanatory.
     words_filtered = [word.lower() for word in words if word.isalnum()]
-    article_contents = list(set(words_filtered))
+    # article_contents = list(set(words_filtered))
+    article_contents = words_filtered
 
     formatted_data = (
         article_date,
