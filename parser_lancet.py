@@ -25,6 +25,8 @@ def check_updates(parse_limit=None):
             data = parse_article(full_text_url)
             dbworker.add_article(data)
             print(f'Added {data[3]} to database!')
+        else:
+            print('we\'re fine with this article!')
 
     return None
 

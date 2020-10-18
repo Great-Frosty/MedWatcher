@@ -55,7 +55,7 @@ def search(message):
 
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH.value
-    and message.text.strip().lower() not in ('/search', '/subscribe', '/reset', '/help')
+    and message.text.strip().lower() not in ('/search', '/subscribe', '/help')
     )
 def get_keywords(message):
     dbworker.set_user_terms(message.chat.id, message.text, 'SEARCH', 'KEYWORDS')
@@ -71,7 +71,7 @@ def get_keywords(message):
 
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH_KEYWORDS.value
-    and message.text.strip().lower() not in ('/search', '/subscribe', '/reset', '/help'))
+    and message.text.strip().lower() not in ('/search', '/subscribe', '/help'))
 def get_journals(message):
     dbworker.set_user_terms(message.chat.id, message.text, 'SEARCH', 'JOURNALS')
     dbworker.set_user_state(
@@ -81,6 +81,7 @@ def get_journals(message):
     user_keywords = dbworker.get_user_keywords(message.chat.id, 'SEARCH').split()
 
     collected_data = dbworker.select_by_keywords(user_keywords, message.text.split())
+
     if not collected_data:
         bot.send_message(
             message.chat.id, 'Sorry, i can\'t find what you you\'ve asked.'
@@ -94,17 +95,13 @@ def get_journals(message):
             message.chat.id, config.States.S_START.value
         )
 
-# Минутка архитектуры: Бот должен запоминать пользователя, его предыдущие
-# поиски и подписки. В диалоге будет что-то типа 'Welcome back'.
-# Подписаться заново - пришли время, подписаться как раньше - пришли /ок.
-
-
-# schedule.every(6).hours.do(parser_lancet.check_updates)
 
 if __name__ == "__main__":
 
     while True:
-        polling_thread = threading.Thread(target=bot.infinity_polling, daemon=True)
-        polling_thread.start()
-        parser_lancet.check_updates()
+        parsing_thread = threading.Thread(target=parser_lancet.check_updates, daemon=True)
+        parsing_thread.start()
+        bot.infinity_polling()
+        parsing_thread.join()
 
+#TODO: handle random messages.
