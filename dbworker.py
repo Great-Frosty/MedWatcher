@@ -127,7 +127,6 @@ def get_user_state(user_id):
         return config.States.S_START.value
 
 
-
 def set_user_terms(user_id, keywords, op_type, term):
     '''Inserts user's keywords in the table. Parameter [op_type] should be
     either 'SEARCH' or 'SUB'. Parameter [term] is either 'JOURNALS' or

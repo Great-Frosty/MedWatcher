@@ -14,28 +14,6 @@ telebot.logger.setLevel(logging.INFO)
 bot = telebot.TeleBot(config.token)
 
 
-def makeKeyboard():
-
-    days = [
-        'Monday',
-        'Tuesday',
-        'Wednesday',
-        'Thursday',
-        'Friday',
-        'Saturday',
-        'Sunday',
-        'Select All']
-
-    markup = types.InlineKeyboardMarkup(row_width=4)
-
-    keys = [types.InlineKeyboardButton(text=day,
-                                        callback_data=day) for day in days]
-
-    markup.add(*keys)
-
-    return markup
-
-
 class Keyboard(object):
 
     tick = '✓'
@@ -54,10 +32,14 @@ class Keyboard(object):
 
     def generate_markup(self):
 
-        self.markup = types.InlineKeyboardMarkup(row_width=4)
+        self.markup = types.InlineKeyboardMarkup()
         self.keys = [types.InlineKeyboardButton(text=day,
                                     callback_data=day) for day in self.days]
-        self.markup.add(*self.keys)
+        self.cont_key = types.InlineKeyboardButton(text='Continue',
+                                    callback_data='Continue')
+        self.markup.row(*self.keys[:4])
+        self.markup.row(*self.keys[4:])
+        self.markup.row(self.cont_key)
         return self.markup
 
     def switch_button(self, day):
@@ -78,6 +60,13 @@ class Keyboard(object):
             self.days[day_no] = self.days[day_no][:-1]
         else:
             self.days[day_no] = day + self.tick
+    
+    def selected_days(self):
+        selected = []
+        for day in self.days[:-1]:
+            if day.endswith(self.tick):
+                selected.append(day[:].strip(self.tick))
+        return selected
 
 
 # Handle '/start'
@@ -119,14 +108,23 @@ def subscribe(message):
         message.chat.id, config.States.S_SUB.value
         )
 
-    @bot.callback_query_handler(func=lambda call: True)
+    @bot.callback_query_handler(func=lambda call: True and call.data != 'Continue')
     def switch_button(call):
+        day = call.data
+        keyboard.switch_button(day)
+        new_markup = keyboard.generate_markup()
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=new_markup)
 
-            day = call.data
-            keyboard.switch_button(day)
-            new_markup = keyboard.generate_markup()
-            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=new_markup)
+    @bot.callback_query_handler(func=lambda call: True and call.data == 'Continue')
+    def cont(call):
+        selected_days = keyboard.selected_days()
+        if selected_days:
+            bot.send_message(call.message.chat.id, ', '.join(selected_days))
+            dbworker.set_user_state(call.message.chat.id, config.States.S_SUB_DAYS)
+        else:
+            bot.send_message(call.message.chat.id, 'Please select at least one day.')
 
+#TODO: store days in database, select time, deal with scheduling.
 
 
 @bot.message_handler(commands=['search'])
