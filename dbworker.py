@@ -3,15 +3,6 @@ import json
 import config
 
 
-def adapt_list_to_string(lst):
-    return ', '.join(lst).encode('utf8')
-
-
-def convert_string_to_list(string):
-    reverse = string.decode('utf8').split(', ')
-    return reverse
-
-
 def add_article(data):
     """Inserts parsed article data and some meta information into the db.
     Data must come in a following format:
@@ -19,7 +10,7 @@ def add_article(data):
 
     date, name, journal, url, contents = data
 
-    conn = sql.connect(config.db_file, detect_types=sql.PARSE_DECLTYPES)
+    conn = sql.connect(config.db_file)
     c = conn.cursor()
 
     no_errs = True
@@ -84,7 +75,7 @@ def select_urls(journal):
     c = conn.cursor()
 
     c.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS searchable_urls
-                 USING fts4(journal, url)''')
+                 USING fts5(journal, url)''')
 
     c.execute('''INSERT OR REPLACE
                  INTO searchable_urls
@@ -128,7 +119,13 @@ def get_user_state(user_id):
     state = selected.fetchone()
     conn.commit()
     conn.close()
-    return state[0]
+
+    try:
+        return state[0]
+    except TypeError:
+        add_user(user_id)
+        return config.States.S_START.value
+
 
 
 def set_user_terms(user_id, keywords, op_type, term):
@@ -186,16 +183,12 @@ def check_if_user_exists(user_id):
                              WHERE id = ?''', (user_id,))
     return bool(result.fetchone())
 
-sql.register_adapter(list, adapt_list_to_string)
-sql.register_converter('list', convert_string_to_list)
-
-# if __name__ == "__main__":
 
 conn = sql.connect(config.db_file, detect_types=sql.PARSE_DECLTYPES)
 c = conn.cursor()
 
 c.execute('''CREATE TABLE IF NOT EXISTS articles
-(date text, name text, journal text, url text UNIQUE, contents list)''')
+(date text, name text, journal text, url text UNIQUE, contents text)''')
 
 c.execute('''CREATE TABLE IF NOT EXISTS user_data
                         (id text UNIQUE,

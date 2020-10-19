@@ -26,7 +26,8 @@ def check_updates(parse_limit=None):
             dbworker.add_article(data)
             print(f'Added {data[3]} to database!')
         else:
-            print('we\'re fine with this article!')
+            # print('we\'re fine with this article!')
+            pass
 
     return None
 
@@ -55,14 +56,14 @@ def parse_article(url):
     # We only keep a part of the article located before References,
     # we don't want words from References checked for keywords.
     entire_text = '\n'.join(sections).split('References')[0]
-    words = re.split(re.compile(r'\s'), entire_text)
+    # words = re.split(re.compile(r'\s'), entire_text)
 
     # All words are converted to lowercase,
-    # words containing numbers are discarded.
     # Again, reasoning is rather self-explanatory.
-    words_filtered = [word.lower() for word in words if word.isalnum()]
+    # words_filtered = [word.lower() for word in words if word.isalnum()]
     # article_contents = list(set(words_filtered))
-    article_contents = words_filtered
+    # article_contents = words_filtered
+    article_contents = entire_text
 
     formatted_data = (
         article_date,

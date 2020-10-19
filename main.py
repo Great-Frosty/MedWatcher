@@ -1,17 +1,83 @@
 import logging
-import telebot
 import config
 import schedule
 import dbworker
 import parser_lancet
 import threading
 import re
-
+import telebot
+from telebot import types
 
 logger = telebot.logger
 telebot.logger.setLevel(logging.INFO)
 
 bot = telebot.TeleBot(config.token)
+
+
+def makeKeyboard():
+
+    days = [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday',
+        'Select All']
+
+    markup = types.InlineKeyboardMarkup(row_width=4)
+
+    keys = [types.InlineKeyboardButton(text=day,
+                                        callback_data=day) for day in days]
+
+    markup.add(*keys)
+
+    return markup
+
+
+class Keyboard(object):
+
+    tick = '✓'
+    def __init__(self):
+
+        self.days = [
+                    'Monday',
+                    'Tuesday',
+                    'Wednesday',
+                    'Thursday',
+                    'Friday',
+                    'Saturday',
+                    'Sunday',
+                    'Select All'
+                    ]
+
+    def generate_markup(self):
+
+        self.markup = types.InlineKeyboardMarkup(row_width=4)
+        self.keys = [types.InlineKeyboardButton(text=day,
+                                    callback_data=day) for day in self.days]
+        self.markup.add(*self.keys)
+        return self.markup
+
+    def switch_button(self, day):
+        day_no = self.days.index(day)
+
+        if self.days[day_no] == self.days[-1]:
+            if self.days[-1].startswith('Select'):
+                for i, day in enumerate(self.days[:-1]):
+                    self.days[i] = day.strip(self.tick)
+                    self.days[i] = day + self.tick
+                self.days[-1] = 'Deselect All'
+            else:
+                for i, day in enumerate(self.days[:-1]):
+                    self.days[i] = day.strip(self.tick)
+                self.days[-1] = 'Select All'
+
+        elif self.days[day_no].endswith(self.tick):
+            self.days[day_no] = self.days[day_no][:-1]
+        else:
+            self.days[day_no] = day + self.tick
 
 
 # Handle '/start'
@@ -46,7 +112,21 @@ def send_welcome(message):
 
 @bot.message_handler(commands=['subscribe'])
 def subscribe(message):
-    bot.send_message(message.chat.id, 'работает!')
+    keyboard = Keyboard()
+    markup = keyboard.generate_markup()
+    bot.send_message(message.chat.id, 'Select days', reply_markup=markup)
+    dbworker.set_user_state(
+        message.chat.id, config.States.S_SUB.value
+        )
+
+    @bot.callback_query_handler(func=lambda call: True)
+    def switch_button(call):
+
+            day = call.data
+            keyboard.switch_button(day)
+            new_markup = keyboard.generate_markup()
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=new_markup)
+
 
 
 @bot.message_handler(commands=['search'])
@@ -59,6 +139,7 @@ def search(message):
                     )
 
     dbworker.set_user_state(message.chat.id, config.States.S_SEARCH.value)
+
 
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH.value
@@ -169,10 +250,7 @@ def parts(lst, n=5):
 
 if __name__ == "__main__":
 
-    # while True:
     parsing_thread = threading.Thread(target=parser_lancet.check_updates, daemon=True)
     parsing_thread.start()
     bot.infinity_polling()
     parsing_thread.join()
-
-#TODO: handle random messages.
