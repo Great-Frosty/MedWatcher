@@ -52,22 +52,28 @@ def select_by_keywords(keywords, journals=['Lancet']):
                  INTO searchable_contents
                  SELECT name, journal, url, contents
                  FROM articles''')
+    
+    # try/except here is a hack. if user uses sqlite commands in his request - 
+    # the whole thing crashes. Instead of crashing it - we will simply return 
+    # "bad request" message. Huzzah!
+    try:
+        results = c.execute('''SELECT name, url
+                            FROM
+                            (SELECT name, url, journal
+                                FROM searchable_contents
+                                WHERE contents MATCH ?
+                                ORDER BY bm25(searchable_contents) DESC
+                            )
+                            WHERE journal MATCH ?
+                        ''', (keywords,journals,))
 
-    results = c.execute('''SELECT name, url
-                           FROM
-                           (SELECT name, url, journal
-                            FROM searchable_contents
-                            WHERE contents MATCH ?
-                            ORDER BY bm25(searchable_contents)
-                           )
-                           WHERE journal MATCH ?
-                    ''', (keywords,journals,))
-
-    output = results.fetchall()
-    c.execute('''DELETE FROM searchable_contents''')
-
-    conn.commit()
-    conn.close()
+        output = results.fetchall()
+        c.execute('''DELETE FROM searchable_contents''')
+        
+        conn.commit()
+        conn.close()
+    except:
+        output = []
     return output
 
 
@@ -203,8 +209,4 @@ c.execute('''CREATE TABLE IF NOT EXISTS user_data
 
 conn.commit()
 conn.close()
-
-
-#TODO: reinitialize the database, including /start with the bot
-#TODO: solve search relevance
 #TODO: add scheduling functionality
