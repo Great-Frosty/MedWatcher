@@ -199,10 +199,11 @@ def search(message):
 def get_keywords(message):
     strpd_text = message.text.strip(',;_\'"')
 
-    if not re.search('[a-zA-z]', strpd_text):
+    if not strpd_text.alpha():
         bot.send_message(
             message.chat.id, 'Sorry, I won\'t be able to find those keywords, '
                              'try leaning more towards letters, not numbers.\n'
+                             'For example: instead of "covid-19", just search "covid"\n'
                              'If you\'re somehow stuck - just do a new /search'
                              ' or even /start, I promise, I will still '
                              ' remember you.' 
@@ -346,6 +347,7 @@ def schedule_job(user_id):
 if __name__ == "__main__":
 
     parsing_thread = threading.Thread(target=parser_lancet.check_updates, daemon=True)
+    job_keeper.every(6).hours.do(parsing_thread.run())
     parsing_thread.start()
     running_keeper = job_keeper.run_continuously()
     try:

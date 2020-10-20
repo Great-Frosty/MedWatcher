@@ -31,6 +31,7 @@ def select_by_keywords(keywords, journals=['Lancet']):
     journals to search must be supplied as lists.'''
 
     keywords = ' OR '.join(keywords)
+    print(keywords)
     journals = ' OR '.join(journals)
 
     conn = sql.connect(config.db_file, detect_types=sql.PARSE_DECLTYPES)
