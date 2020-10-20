@@ -287,8 +287,10 @@ def handle_random_message(message):
 @bot.message_handler(commands=['unsub'])
 def unsub(message):
     job_keeper.clear(message.chat.id)
+    bot.send_message(message.chat.id, 'You\'re unsubbed. Hope we\'ll talk again:)')
 
 
+# This one is just awful. fix it!
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH_KEYWORDS.value
     or dbworker.get_user_state(message.chat.id) == config.States.S_SUB_KEYWORDS.value 
