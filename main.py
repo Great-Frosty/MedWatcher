@@ -108,23 +108,52 @@ def subscribe(message):
         message.chat.id, config.States.S_SUB.value
         )
 
+    # Starting a function name with an underscore disables "Unused variable"
+    # warnings. Thank you, stackoverflow!
     @bot.callback_query_handler(func=lambda call: True and call.data != 'Continue')
-    def switch_button(call):
+    def _switch_button(call):
         day = call.data
         keyboard.switch_button(day)
         new_markup = keyboard.generate_markup()
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=new_markup)
 
     @bot.callback_query_handler(func=lambda call: True and call.data == 'Continue')
-    def cont(call):
+    def _cont(call):
         selected_days = keyboard.selected_days()
         if selected_days:
-            bot.send_message(call.message.chat.id, ', '.join(selected_days))
-            dbworker.set_user_state(call.message.chat.id, config.States.S_SUB_DAYS)
+            dbworker.set_user_state(call.message.chat.id, config.States.S_SUB_DAYS.value)
+            dbworker.set_mailing_days(call.message.chat.id, ','.join(selected_days))
+            bot.send_message(call.message.chat.id, 'We are on track! '
+                                                   'Next order of business - time. '
+                                                   'To simplify the whole ordeal - '
+                                                   'just send me one number from 0 to 23 '
+                                                   '- that would be the hour of day at '
+                                                   'which you would want to recieve your '
+                                                   'articles.')
         else:
             bot.send_message(call.message.chat.id, 'Please select at least one day.')
 
-#TODO: store days in database, select time, deal with scheduling.
+
+@bot.message_handler(
+    func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SUB_DAYS.value
+    and message.text.strip().lower() not in ('/search', '/subscribe', '/help')
+)
+def get_time(message):
+    time = message.text.strip()
+    if not time.isnumeric():
+        bot.send_message(message.chat.id, 'That\'s not a very good input. '
+                                          'I only need a time of day '
+                                          'right now. One number from 0 to 23 '
+                                          'will do nicely.')
+    elif int(time) not in range(24):
+        bot.send_message(message.chat.id, 'So close! It\'s now a number, '
+                                          'but it\'s still not in 0-23 range. '
+                                          'Another try maybe?')
+    else:
+        dbworker.set_user_delivery_time(message.chat.id, time)
+        bot.send_message(message.chat.id, 'Great! Now send me the keywords, '
+                                          'you want to track.')
+        dbworker.set_user_state(message.chat.id, config.States.S_SUB_TIME.value)
 
 
 @bot.message_handler(commands=['search'])
@@ -141,6 +170,7 @@ def search(message):
 
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH.value
+    or dbworker.get_user_state(message.chat.id) == config.States.S_SUB_TIME.value 
     and message.text.strip().lower() not in ('/search', '/subscribe', '/help')
     )
 def get_keywords(message):
@@ -155,16 +185,24 @@ def get_keywords(message):
                              ' remember you.' 
         )
     else:
-        dbworker.set_user_terms(message.chat.id, strpd_text, 'SEARCH', 'KEYWORDS')
+        user_state = dbworker.get_user_state(message.chat.id)
+        keywords_type = ''
+        if user_state == config.States.S_SEARCH.value:
+            keywords_type = 'SEARCH'
+        elif user_state == config.States.S_SUB_TIME.value:
+            keywords_type = 'SUB'
+        
+        dbworker.set_user_terms(message.chat.id, strpd_text, keywords_type, 'KEYWORDS')
         bot.send_message(message.chat.id,
                         ('Nice! Now send me the names of the journals you want'
                         ' me to search in. Sadly at moment I can only look for'
                         ' things in one journal - \'Lancet\'. But I promise to '
                         'become more diligent in the future. ')
                         )
+        next_state = f'config.States.S_{keywords_type}_KEYWORDS.value'
         dbworker.set_user_state(
                                 message.chat.id,
-                                config.States.S_SEARCH_KEYWORDS.value
+                                next_state
                                 )
 
 
@@ -181,6 +219,7 @@ def handle_random_message(message):
 
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH_KEYWORDS.value
+    or dbworker.get_user_state(message.chat.id) == config.States.S_SUB_KEYWORDS.value 
     and message.text.strip().lower() not in ('/search', '/subscribe', '/help'))
 def get_journals(message):
     strpd_text = message.text.strip(',;_\'"')
@@ -195,32 +234,42 @@ def get_journals(message):
                              ' remember you.'
         )
     else:
-        dbworker.set_user_terms(message.chat.id, strpd_text, 'SEARCH', 'JOURNALS')
-        dbworker.set_user_state(
-            message.chat.id,
-            config.States.S_SEARCH_JOURNALS.value
-        )
-        user_keywords = dbworker.get_user_keywords(message.chat.id, 'SEARCH').split()
+        user_state = dbworker.get_user_state(message.chat.id)
+        keywords_type = ''
+        if user_state == config.States.S_SEARCH_KEYWORDS.value:
+            keywords_type = 'SEARCH'
+        elif user_state == config.States.S_SUB_KEYWORDS.value:
+            keywords_type = 'SUB'
 
-        collected_data = dbworker.select_by_keywords(user_keywords, message.text.split())
+        dbworker.set_user_terms(message.chat.id, strpd_text, keywords_type, 'JOURNALS')
+        next_state = f'config.States.S_{keywords_type}_JOURNALS.value'
+        dbworker.set_user_state(message.chat.id, next_state)
 
-        if not collected_data:
-            bot.send_message(
-                message.chat.id, 'Sorry, i can\'t find what you you\'ve asked.'
-                )
-            dbworker.set_user_state(
-                message.chat.id,
-                config.States.S_START.value)
-        else:
-            formatted_data = format(collected_data)
+        collect_and_send(message.chat.id, keywords_type)
 
-            for part in formatted_data:
-                text = '\n\n'.join(part)
-                bot.send_message(message.chat.id, text, parse_mode='html', disable_web_page_preview=False)
+def collect_and_send(user_id, op_type):
+    user_keywords = dbworker.get_user_keywords(user_id, op_type).split()
+    user_journals = dbworker.get_user_journals(user_id, op_type).split()
 
-            dbworker.set_user_state(
-                message.chat.id, config.States.S_START.value
+    collected_data = dbworker.select_by_keywords(user_keywords,user_journals)
+
+    if not collected_data:
+        bot.send_message(
+            user_id, 'Sorry, i can\'t find what you you\'re looking for.'
             )
+        dbworker.set_user_state(
+            user_id,
+            config.States.S_START.value)
+    else:
+        formatted_data = format(collected_data)
+
+        for part in formatted_data:
+            text = '\n\n'.join(part)
+            bot.send_message(user_id, text, parse_mode='html', disable_web_page_preview=False)
+
+        dbworker.set_user_state(
+            user_id, config.States.S_START.value
+        )
 
 
 def format(collected_data):

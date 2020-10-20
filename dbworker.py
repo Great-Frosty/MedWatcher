@@ -120,6 +120,7 @@ def get_user_state(user_id):
     conn.commit()
     conn.close()
 
+    # This is a bad thing to do. Needs to be fixed later.
     try:
         return state[0]
     except TypeError:
@@ -134,10 +135,12 @@ def set_user_terms(user_id, keywords, op_type, term):
 
     # This clause is needed to use a single function for several different
     # data insertion operations.
+    insertion_column = ''
     if op_type == 'SEARCH':
         insertion_column = f'{term.lower()}_searched'
     elif op_type == 'SUB':
         insertion_column = f'{term.lower()}_subbed'
+
 
     conn = sql.connect(config.db_file)
     conn.execute('''UPDATE user_data
@@ -162,6 +165,61 @@ def get_user_keywords(user_id, op_type):
                     WHERE id = ?''', (user_id, ))
     keywords = res.fetchone()
     return keywords[0]
+
+
+def get_user_journals(user_id, op_type):
+    '''Returns user's journals.'''
+
+    if op_type == 'SEARCH':
+        selected_column = 'journals_searched'
+    elif op_type == 'SUB':
+        selected_column = 'journals_subbed'
+    
+    conn = sql.connect(config.db_file)
+    res = conn.execute('''SELECT ''' + selected_column +
+                    ''' FROM user_data
+                    WHERE id = ?''', (user_id, ))
+    keywords = res.fetchone()
+    return keywords[0]
+
+
+def set_mailing_days(user_id, days):
+
+    conn = sql.connect(config.db_file)
+    conn.execute('''UPDATE user_data
+                    SET days = ?
+                    WHERE id = ?''', (days, user_id))
+    conn.commit()
+    conn.close()
+
+
+def get_mailing_days(user_id):
+
+    conn = sql.connect(config.db_file)
+    res = conn.execute('''SELECT days
+                          FROM user_data
+                          WHERE id = ?''', (user_id,))
+    output = res.fetchone()
+    return output
+
+
+def set_user_delivery_time(user_id, time):
+
+    conn = sql.connect(config.db_file)
+    conn.execute('''UPDATE user_data
+                    SET time = ?
+                    WHERE id = ?''', (time, user_id))
+    conn.commit()
+    conn.close()
+
+
+def get_user_delivery_time(user_id):
+
+    conn = sql.connect(config.db_file)
+    res = conn.execute('''SELECT time
+                    FROM user_data
+                    WHERE id = ?''', (user_id,))
+    return res
 
 
 def add_user(user_id):
