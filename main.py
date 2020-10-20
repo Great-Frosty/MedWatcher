@@ -296,9 +296,11 @@ def unsub(message):
     or dbworker.get_user_state(message.chat.id) == config.States.S_SUB_KEYWORDS.value 
     and message.text.strip().lower() not in ('/search', '/subscribe', '/help', '/unsub'))
 def get_journals(message):
-    strpd_text = message.text.strip(',;_\'"')
+    strpd_text = message.text.strip(',;_\'"').lower()
 
-    if not re.search('[a-zA-z]', strpd_text):
+    if strpd_text not in ['lancet']:
+        bot.send_message(message.chat.id, 'Cmon man, just type in "lancet"')
+    elif not re.search('[a-zA-z]', strpd_text):
         bot.send_message(
             message.chat.id, 'I\'m pretty sure no journal in the world is '
                              'named like that. A letter is worth a thousand '
