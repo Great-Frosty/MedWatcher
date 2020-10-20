@@ -7,7 +7,53 @@ import parser_lancet
 import threading
 import re
 import telebot
+import logging
+import ssl
+
+from aiohttp import web
 from telebot import types
+
+
+API_TOKEN = '1196869629:AAGWmpWV3hO8D-WCZKK4dz-ryew00XDCkTg'
+
+WEBHOOK_HOST = '35.199.188.65'
+WEBHOOK_PORT = 8443  # 443, 80, 88 or 8443 (port need to be 'open')
+WEBHOOK_LISTEN = '0.0.0.0'  # In some VPS you may need to put here the IP addr
+
+WEBHOOK_SSL_CERT = 'ssh/url_cert.pem'  # Path to the ssl certificate
+WEBHOOK_SSL_PRIV = 'ssh/url_private.key'  # Path to the ssl private key
+
+# Quick'n'dirty SSL certificate generation:
+#
+# openssl genrsa -out webhook_pkey.pem 2048
+# openssl req -new -x509 -days 3650 -key webhook_pkey.pem -out webhook_cert.pem
+#
+# When asked for "Common Name (e.g. server FQDN or YOUR name)" you should reply
+# with the same value in you put in WEBHOOK_HOST
+
+WEBHOOK_URL_BASE = "https://{}:{}".format(WEBHOOK_HOST, WEBHOOK_PORT)
+WEBHOOK_URL_PATH = "/{}/".format(API_TOKEN)
+
+logger = telebot.logger
+telebot.logger.setLevel(logging.INFO)
+
+bot = telebot.TeleBot(API_TOKEN)
+
+app = web.Application()
+
+
+# Process webhook calls
+async def handle(request):
+    if request.match_info.get('token') == bot.token:
+        request_body_dict = await request.json()
+        update = telebot.types.Update.de_json(request_body_dict)
+        bot.process_new_updates([update])
+        return web.Response()
+    else:
+        return web.Response(status=403)
+
+
+app.router.add_post('/{token}/', handle)
 
 logger = telebot.logger
 telebot.logger.setLevel(logging.INFO)
@@ -338,21 +384,40 @@ def schedule_job(user_id):
     for d in days:
 
         day = d.lower()
-        job_string = f'job_keeper.every().{day}.at("{delivery_time}").do(job, user_id={user_id}).tag("{user_id}")'
-        # exec(job_string)
-        exec(f'job_keeper.every().second.do(mailing_job, user_id={user_id}).tag("{user_id}")')
+        job_string = f'job_keeper.every().{day}.at("{delivery_time}").do(mailing_job, user_id={user_id}).tag("{user_id}")'
+        exec(job_string)
 
 
-if __name__ == "__main__":
+# Remove webhook, it fails sometimes the set if there is a previous webhook
+bot.remove_webhook()
 
-    parsing_thread = threading.Thread(target=parser_lancet.check_updates, daemon=True)
-    parsing_thread.start()
-    running_keeper = job_keeper.run_continuously()
-    try:
-        bot.infinity_polling()
-    except KeyboardInterrupt:
-        running_keeper.set()
-        parsing_thread.join()
-        print ("threads successfully closed")
+# Set webhook
+bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
+                certificate=open(WEBHOOK_SSL_CERT, 'r'))
 
-    #TODO: schedule mailing in a separate thread probably??? scheduling workks, mailing = broken
+# Build ssl context
+context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+context.load_cert_chain(WEBHOOK_SSL_CERT, WEBHOOK_SSL_PRIV)
+
+# Start aiohttp server
+web.run_app(
+    app,
+    host=WEBHOOK_LISTEN,
+    port=WEBHOOK_PORT,
+    ssl_context=context,
+)
+
+
+parsing_thread = threading.Thread(target=parser_lancet.check_updates, daemon=True)
+
+parsing_thread.start()
+running_keeper = job_keeper.run_continuously()
+try:
+    bot.infinity_polling()
+except KeyboardInterrupt:
+    running_keeper.set()
+    parsing_thread.join()
+    print ("threads successfully closed")
+
+#TODO: schedule mailing in a separate thread probably??? scheduling workks, mailing = broken
+#TODO: handle bad journals, comment out code, clean up if possible, properly schedule parser.
