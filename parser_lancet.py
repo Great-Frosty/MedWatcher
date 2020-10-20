@@ -1,11 +1,12 @@
 import re
 import os
 import requests
+import dbworker
 import pandas as pd
 from bs4 import BeautifulSoup
 
 
-def check_updates(existing, parse_limit=None):
+def check_updates(parse_limit=None):
     '''Goes through the list of articles at a given url, parses and adds new
     articles to storage. Returns a DataFrame.'''
 
@@ -13,18 +14,22 @@ def check_updates(existing, parse_limit=None):
     r = requests.get(url)
     soup = BeautifulSoup(r.text, 'lxml')
 
+    existing_urls = dbworker.select_urls('Lancet')
+
     # Next cycle checks if article is already in storage, parses it if not.
     for art in soup.find_all('div', class_='article-details')[:parse_limit]:
         text_url = art.find(href=re.compile(r'fulltext'))['href']
         full_text_url = f'https://www.thelancet.com{text_url}'
 
-        if full_text_url not in existing['url'].values:
+        if full_text_url not in existing_urls:
             data = parse_article(full_text_url)
-            existing = existing.append(data, ignore_index=True)
+            dbworker.add_article(data)
+            print(f'Added {data[3]} to database!')
         else:
-            print('We already have this article in storage.')
+            # print('we\'re fine with this article!')
+            pass
 
-    return existing
+    return None
 
 
 def parse_article(url):
@@ -51,48 +56,24 @@ def parse_article(url):
     # We only keep a part of the article located before References,
     # we don't want words from References checked for keywords.
     entire_text = '\n'.join(sections).split('References')[0]
-    words = re.split(re.compile(r'\s'), entire_text)
+    # words = re.split(re.compile(r'\s'), entire_text)
 
     # All words are converted to lowercase,
-    # words containing numbers are discarded.
     # Again, reasoning is rather self-explanatory.
-    words_filtered = [word.lower() for word in words if word.isalpha()]
-    article_contents = list(set(words_filtered))
+    # words_filtered = [word.lower() for word in words if word.isalnum()]
+    # article_contents = list(set(words_filtered))
+    # article_contents = words_filtered
+    article_contents = entire_text
 
-    formatted_data = {
-        'name': article_name,
-        'date': article_date,
-        'url': url,
-        'contents': article_contents
-    }
-
+    formatted_data = (
+        article_date,
+        article_name,
+        'Lancet',
+        url,
+        article_contents
+    )
     return formatted_data
 
 
-def is_non_zero_file(fpath):
-    '''Checks if the specified file exists and is not empty.'''
-
-    return os.path.isfile(fpath) and os.path.getsize(fpath) > 0
-
-
-def parse():
-
-    # First we try to read DataFrame from storage.
-    # If it's empty - we create a new one.
-    if is_non_zero_file('article_storage.json'):
-        with open('article_storage.json', 'r') as file:
-            existing_articles = pd.read_json(file, convert_dates=False)
-        print('Storage successfully read!')
-    else:
-        print('Article storage is empty.')
-        columns = ['name', 'date', 'url', 'contents']
-        existing_articles = pd.DataFrame(columns=columns)
-
-    existing_articles = check_updates(existing_articles)
-
-    with open('article_storage.json', 'w') as file:
-        existing_articles.to_json(file, orient='columns', date_format=None)
-
-
 if __name__ == "__main__":
-    parse()
+    check_updates()
