@@ -319,7 +319,20 @@ def get_journals(message):
         if dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH_JOURNALS.value:
             collect_and_send(message.chat.id, keywords_type)
         elif dbworker.get_user_state(message.chat.id) == config.States.S_SUB_JOURNALS.value:
-            schedule_job(message.chat.id)
+            user_keywords = dbworker.get_user_keywords(message.chat.id, 'SUB').split()
+            user_journals = dbworker.get_user_journals(message.chat.id, 'SUB').split()
+
+            collected_data = dbworker.select_by_keywords(user_keywords,user_journals)
+            if not collected_data:
+                bot.send_message(message.chat.id, 'Fair warning:\nI have no  '
+                                                'matches with those keywords'
+                                                ' in my archive. Your '
+                                                'subscription probably won\'t'
+                                                'yield any results.')
+            else:
+                schedule_job(message.chat.id)
+                bot.send_message(message.chat.id, 'Great! You have '
+                                                  'successfully subscribed!')
 
 def collect_and_send(user_id, op_type):
     user_keywords = dbworker.get_user_keywords(user_id, op_type).split()
@@ -413,7 +426,7 @@ parsing_thread = threading.Thread(target=parser_lancet.check_updates, daemon=Tru
 parsing_thread.start()
 running_keeper = job_keeper.run_continuously()
 try:
-    bot.infinity_polling()
+    time.sleep(.1)
 except KeyboardInterrupt:
     running_keeper.set()
     parsing_thread.join()
@@ -421,3 +434,4 @@ except KeyboardInterrupt:
 
 #TODO: schedule mailing in a separate thread probably??? scheduling workks, mailing = broken
 #TODO: handle bad journals, comment out code, clean up if possible, properly schedule parser.
+#TODO: reply to complete subscription. with subscription dta mb.
