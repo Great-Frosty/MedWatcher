@@ -279,8 +279,9 @@ def handle_random_message(message):
     bot.reply_to(
         message, 'Well, this was rather random. At this point of '
                  'our conversation it would be more fruitful to use'
-                 ' either /search or /subscribe.'
-    )
+                 ' either /search or /subscribe. You can /unsub if I get'
+                 ' too much.'
+                )
 
 
 @bot.message_handler(commands=['unsub'])
@@ -318,6 +319,8 @@ def get_journals(message):
 
         if dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH_JOURNALS.value:
             collect_and_send(message.chat.id, keywords_type)
+            dbworker.set_user_state(message.chat.id, config.States.S_START.value)
+
         elif dbworker.get_user_state(message.chat.id) == config.States.S_SUB_JOURNALS.value:
             user_keywords = dbworker.get_user_keywords(message.chat.id, 'SUB').split()
             user_journals = dbworker.get_user_journals(message.chat.id, 'SUB').split()
@@ -333,6 +336,8 @@ def get_journals(message):
                 schedule_job(message.chat.id)
                 bot.send_message(message.chat.id, 'Great! You have '
                                                   'successfully subscribed!')
+                dbworker.set_user_state(message.chat.id, config.States.S_START.value)
+
 
 def collect_and_send(user_id, op_type):
     user_keywords = dbworker.get_user_keywords(user_id, op_type).split()
@@ -344,9 +349,7 @@ def collect_and_send(user_id, op_type):
         bot.send_message(
             user_id, 'Sorry, i can\'t find what you you\'re looking for.'
             )
-        dbworker.set_user_state(
-            user_id,
-            config.States.S_START.value)
+
     else:
         formatted_data = format(collected_data)
 
