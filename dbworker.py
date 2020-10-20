@@ -199,8 +199,8 @@ def get_mailing_days(user_id):
     res = conn.execute('''SELECT days
                           FROM user_data
                           WHERE id = ?''', (user_id,))
-    output = res.fetchone()
-    return output
+    days = res.fetchone()
+    return days[0]
 
 
 def set_user_delivery_time(user_id, time):
@@ -219,7 +219,8 @@ def get_user_delivery_time(user_id):
     res = conn.execute('''SELECT time
                     FROM user_data
                     WHERE id = ?''', (user_id,))
-    return res
+    time = res.fetchone()
+    return time[0]
 
 
 def add_user(user_id):

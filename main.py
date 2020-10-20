@@ -1,6 +1,7 @@
 import logging
 import config
 import schedule
+import time
 import dbworker
 import parser_lancet
 import threading
@@ -13,6 +14,28 @@ telebot.logger.setLevel(logging.INFO)
 
 bot = telebot.TeleBot(config.token)
 
+# Extends shedule, allows running jobs in parralel with infinity polling.
+class JobRunner(schedule.Scheduler):
+
+    def run_continuously(self, interval=1):
+        """Continuously run, while executing pending jobs at each elapsed
+        time interval.
+        @return cease_continuous_run: threading.Event which can be set to
+        cease continuous run."""
+        cease_continuous_run = threading.Event()
+
+        class ScheduleThread(threading.Thread):
+            @classmethod
+            def run(cls):
+                while not cease_continuous_run.is_set():
+                    self.run_pending()
+                    time.sleep(interval)
+
+        continuous_thread = ScheduleThread(daemon=True)
+        continuous_thread.start()
+        return cease_continuous_run
+
+job_keeper = JobRunner()
 
 class Keyboard(object):
 
@@ -49,7 +72,7 @@ class Keyboard(object):
             if self.days[-1].startswith('Select'):
                 for i, day in enumerate(self.days[:-1]):
                     self.days[i] = day.strip(self.tick)
-                    self.days[i] = day + self.tick
+                    self.days[i] = self.days[i] + self.tick
                 self.days[-1] = 'Deselect All'
             else:
                 for i, day in enumerate(self.days[:-1]):
@@ -69,7 +92,6 @@ class Keyboard(object):
         return selected
 
 
-# Handle '/start'
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
 
@@ -90,6 +112,7 @@ def send_welcome(message):
                     ' \"constant stream of knowledge in my face\"'
                     ' type of person — it\'s fine.\n'
                     '/subscribe will hook you up.\n'
+                    '/unsub if you don\'t want to recieve articles'
                     '/help\n might also come in handy, '
                     'but you\'ve probaby figured that one out already...'))
     else:
@@ -136,7 +159,7 @@ def subscribe(message):
 
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SUB_DAYS.value
-    and message.text.strip().lower() not in ('/search', '/subscribe', '/help')
+    and message.text.strip().lower() not in ('/search', '/subscribe', '/help', '/unsub')
 )
 def get_time(message):
     time = message.text.strip()
@@ -171,7 +194,7 @@ def search(message):
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH.value
     or dbworker.get_user_state(message.chat.id) == config.States.S_SUB_TIME.value 
-    and message.text.strip().lower() not in ('/search', '/subscribe', '/help')
+    and message.text.strip().lower() not in ('/search', '/subscribe', '/help', '/unsub')
     )
 def get_keywords(message):
     strpd_text = message.text.strip(',;_\'"')
@@ -200,15 +223,12 @@ def get_keywords(message):
                         'become more diligent in the future. ')
                         )
         next_state = f'config.States.S_{keywords_type}_KEYWORDS.value'
-        dbworker.set_user_state(
-                                message.chat.id,
-                                next_state
-                                )
+        exec(f'dbworker.set_user_state(message.chat.id, {next_state})')
 
 
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_START.value
-    and message.text.strip().lower() not in ('/search', '/subscribe', '/help'))
+    and message.text.strip().lower() not in ('/search', '/subscribe', '/help', '/unsub'))
 def handle_random_message(message):
     bot.reply_to(
         message, 'Well, this was rather random. At this point of '
@@ -217,10 +237,15 @@ def handle_random_message(message):
     )
 
 
+@bot.message_handler(commands=['unsub'])
+def unsub(message):
+    job_keeper.clear(message.chat.id)
+
+
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH_KEYWORDS.value
     or dbworker.get_user_state(message.chat.id) == config.States.S_SUB_KEYWORDS.value 
-    and message.text.strip().lower() not in ('/search', '/subscribe', '/help'))
+    and message.text.strip().lower() not in ('/search', '/subscribe', '/help', '/unsub'))
 def get_journals(message):
     strpd_text = message.text.strip(',;_\'"')
 
@@ -243,9 +268,12 @@ def get_journals(message):
 
         dbworker.set_user_terms(message.chat.id, strpd_text, keywords_type, 'JOURNALS')
         next_state = f'config.States.S_{keywords_type}_JOURNALS.value'
-        dbworker.set_user_state(message.chat.id, next_state)
+        exec(f'dbworker.set_user_state(message.chat.id, {next_state})')
 
-        collect_and_send(message.chat.id, keywords_type)
+        if dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH_JOURNALS.value:
+            collect_and_send(message.chat.id, keywords_type)
+        elif dbworker.get_user_state(message.chat.id) == config.States.S_SUB_JOURNALS.value:
+            schedule_job(message.chat.id)
 
 def collect_and_send(user_id, op_type):
     user_keywords = dbworker.get_user_keywords(user_id, op_type).split()
@@ -266,10 +294,6 @@ def collect_and_send(user_id, op_type):
         for part in formatted_data:
             text = '\n\n'.join(part)
             bot.send_message(user_id, text, parse_mode='html', disable_web_page_preview=False)
-
-        dbworker.set_user_state(
-            user_id, config.States.S_START.value
-        )
 
 
 def format(collected_data):
@@ -295,9 +319,40 @@ def parts(lst, n=5):
         yield lst[i:i+n]
 
 
+def mailing_job(user_id):
+    # collect_and_send(user_id, 'SUB')
+    bot.send_message(user_id, 'Working!')
+    print('working')
+
+
+def schedule_job(user_id):
+
+    days = dbworker.get_mailing_days(user_id).split(',')
+    delivery_time = dbworker.get_user_delivery_time(user_id)
+
+    if len(delivery_time) == 1:
+        delivery_time = '0' + delivery_time + ':00'
+    else:
+        delivery_time = delivery_time + ':00'
+
+    for d in days:
+
+        day = d.lower()
+        job_string = f'job_keeper.every().{day}.at("{delivery_time}").do(job, user_id={user_id}).tag("{user_id}")'
+        # exec(job_string)
+        exec(f'job_keeper.every().second.do(mailing_job, user_id={user_id}).tag("{user_id}")')
+
+
 if __name__ == "__main__":
 
     parsing_thread = threading.Thread(target=parser_lancet.check_updates, daemon=True)
     parsing_thread.start()
-    bot.infinity_polling()
-    parsing_thread.join()
+    running_keeper = job_keeper.run_continuously()
+    try:
+        bot.infinity_polling()
+    except KeyboardInterrupt:
+        running_keeper.set()
+        parsing_thread.join()
+        print ("threads successfully closed")
+
+    #TODO: schedule mailing in a separate thread probably??? scheduling workks, mailing = broken
