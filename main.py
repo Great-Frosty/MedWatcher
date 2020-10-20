@@ -299,16 +299,17 @@ def get_journals(message):
     strpd_text = message.text.strip(',;_\'"').lower()
 
     if strpd_text not in ['lancet']:
-        bot.send_message(message.chat.id, 'Cmon man, just type in "lancet"')
-    elif not re.search('[a-zA-z]', strpd_text):
-        bot.send_message(
-            message.chat.id, 'I\'m pretty sure no journal in the world is '
+        if not re.search('[a-zA-z]', strpd_text):
+            bot.send_message(
+                message.chat.id, 'I\'m pretty sure no journal in the world is '
                              'named like that. A letter is worth a thousand '
                              'numbers in this case.\n'
                              'If you\'re somehow stuck - just do a new /search'
                              ' or even /start, I promise, I will still '
                              ' remember you.'
-        )
+                            )
+        else:
+            bot.send_message(message.chat.id, 'Cmon man, just type in "lancet"')
     else:
         user_state = dbworker.get_user_state(message.chat.id)
         keywords_type = ''
@@ -442,3 +443,4 @@ except KeyboardInterrupt:
 #TODO: schedule mailing in a separate thread probably??? scheduling workks, mailing = broken
 #TODO: handle bad journals, comment out code, clean up if possible, properly schedule parser.
 #TODO: reply to complete subscription. with subscription dta mb.
+#TODO: dbworker would probably handle easier as a class.
