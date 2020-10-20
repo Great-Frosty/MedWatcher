@@ -5,7 +5,6 @@ import time
 import dbworker
 import parser_lancet
 import threading
-import re
 import telebot
 import logging
 import ssl
@@ -245,10 +244,11 @@ def search(message):
 def get_keywords(message):
     strpd_text = message.text.strip(',;_\'"')
 
-    if not re.search('[a-zA-z]', strpd_text):
+    if not strpd_text.isalpha():
         bot.send_message(
             message.chat.id, 'Sorry, I won\'t be able to find those keywords, '
                              'try leaning more towards letters, not numbers.\n'
+                             'For example: instead of "covid-19 try "covid".\n'
                              'If you\'re somehow stuck - just do a new /search'
                              ' or even /start, I promise, I will still '
                              ' remember you.' 
@@ -430,8 +430,8 @@ web.run_app(
 
 
 parsing_thread = threading.Thread(target=parser_lancet.check_updates, daemon=True)
+job_keeper.every(6).hours.do(parsing_thread.start())
 
-parsing_thread.start()
 running_keeper = job_keeper.run_continuously()
 try:
     time.sleep(.1)
