@@ -34,6 +34,7 @@ bot = telebot.TeleBot(API_TOKEN, threaded=False)
 
 app = web.Application()
 
+
 # Process webhook calls
 async def handle(request):
     if request.match_info.get('token') == bot.token:
