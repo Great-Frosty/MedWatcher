@@ -235,7 +235,7 @@ def search(message):
 def get_keywords(message):
     strpd_text = message.text.strip(',;_\'"')
 
-    if not strpd_text.isalpha():
+    if not re.search('[A-Z a-z]', strpd_text):
         bot.send_message(
             message.chat.id, 'Sorry, I won\'t be able to find those keywords, '
                              'try leaning more towards letters, not numbers.\n'
