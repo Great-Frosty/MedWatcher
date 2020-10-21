@@ -190,7 +190,7 @@ def subscribe(message):
         day = call.data
         keyboard.switch_button(day)
         new_markup = keyboard.generate_markup()
-        bot.edit_message_reply_markup(call.user_id,
+        bot.edit_message_reply_markup(user_id,
                                       call.message.message_id,
                                       reply_markup=new_markup)
 
@@ -198,9 +198,9 @@ def subscribe(message):
     def _cont(call):
         selected_days = keyboard.selected_days()
         if selected_days:
-            db.set_user_state(call.user_id, sts.S_SUB_DAYS.value)
-            db.set_mailing_days(call.user_id, ','.join(selected_days))
-            bot.send_message(call.user_id,
+            db.set_user_state(user_id, sts.S_SUB_DAYS.value)
+            db.set_mailing_days(user_id, ','.join(selected_days))
+            bot.send_message(user_id,
                              'We are on track! '
                              'Next order of business - time. '
                              'To simplify the whole ordeal - '
@@ -209,7 +209,7 @@ def subscribe(message):
                              'which you would want to recieve your '
                              'articles.')
         else:
-            bot.send_message(call.user_id, 'Please select at least one day.')
+            bot.send_message(user_id, 'Please select at least one day.')
 
 
 @bot.message_handler(
