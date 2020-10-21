@@ -370,5 +370,4 @@ c.execute('''CREATE TABLE IF NOT EXISTS user_keyboards
 
 conn.commit()
 conn.close()
-# add_user('123')
 # TODO: add scheduling functionality
