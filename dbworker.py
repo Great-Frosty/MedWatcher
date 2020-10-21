@@ -16,8 +16,21 @@ def add_user(user_id):
     '''Adds a new user in the database.'''
 
     conn = sql.connect(config.db_file)
-    conn.execute('''INSERT INTO user_data (id)
-                    VALUES(?)''', (user_id,))
+    # conn.execute('''INSERT INTO user_data (id)
+    #                 VALUES(?)''', (user_id,))
+    conn.execute('''INSERT INTO user_keyboards (id)
+                    VALUES (?)''', (user_id, ))
+    conn.execute('''UPDATE user_keyboards
+                    SET lanc_search = ?,
+                            lanc_sub = ?,
+                            monday = ?,
+                            tuesday = ?,
+                            wednesday = ?,
+                            thursday = ?,
+                            friday = ?,
+                            saturday = ?,
+                            sunday = ?
+                    WHERE id = ?''', (0, 0, 0, 0, 0, 0, 0, 0, 0, user_id,))
     conn.commit()
     conn.close()
 
@@ -241,6 +254,93 @@ def get_user_delivery_time(user_id):
     return time[0]
 
 
+def set_keyboard(user_id, keyb_type, req_type, callback):
+
+    button_name = callback[0]
+    button_state = callback[1]
+    # 'lanc_' + 'sub_' + 'callback'
+    conn = sql.connect(config.db_file)
+
+    if button_state == 0:
+        conn.execute('''UPDATE user_keyboards
+                        SET (? || ?) = ?
+                        WHERE id = ?''', (button_name, req_type, '1', user_id))
+    elif button_state == 1:
+        conn.execute('''UPDATE user_keyboards
+                        SET (? || ?) = ?
+                        WHERE id = ?''', (button_name, req_type, '0', user_id))
+    if button_state == 2:
+        if req_type == 'sub':
+            if keyb_type == 'days':
+                conn.execute('''UPDATE user_keyboards
+                                SET (monday,
+                                     tuesday,
+                                     wednesday,
+                                     thursday,
+                                     friday,
+                                     saturday,
+                                     sunday) = 0
+                                WHERE id = ?''', (user_id))
+            if keyb_type == 'journals':
+                conn.execute('''UPDATE user_keyboards
+                                SET lanc_sub = 0
+                                WHERE id = ?''', (user_id))
+
+        if req_type == 'search':
+            conn.execute('''UPDATE user_keyboards
+                            SET lanc_search = 0
+                            WHERE id = ?''', (user_id))
+    if button_state == 3:
+        if req_type == 'sub':
+            if keyb_type == 'days':
+                conn.execute('''UPDATE user_keyboards
+                                SET (monday,
+                                     tuesday,
+                                     wednesday,
+                                     thursday,
+                                     friday,
+                                     saturday,
+                                     sunday) = 1
+                                WHERE id = ?''', (user_id))
+            if keyb_type == 'journals':
+                conn.execute('''UPDATE user_keyboards
+                                SET lanc_sub = 1
+                                WHERE id = ?''', (user_id))
+
+        if req_type == 'search':
+            conn.execute('''UPDATE user_keyboards
+                            SET lanc_search = 1
+                            WHERE id = ?''', (user_id))        
+
+    conn.commit()
+    conn.close()
+
+
+def get_keyboard(user_id, keyb_type, req_type):
+    conn = sql.connect(config.db_file)
+    if req_type == 'search':
+        curs = conn.execute('''SELECT lanc_search
+                               FROM user_keyboards
+                               WHERE id = ?''', (user_id, ))
+        output = curs.fetchone()[0]
+        return output
+
+    if req_type == 'sub':
+        if keyb_type == 'journals':
+            conn.execute('''SELECT lanc_sub
+                            FROM user_keyboards
+                            WHERE id = ?''', (user_id, ))
+            output = curs.fetchone()[0]
+            return output
+
+        if keyb_type == 'days':
+            curs = conn.execute('''SELECT monday, tuesday, wednesday, thursday, friday, saturday, sunday
+                            FROM user_keyboards''')
+            output = curs.fetchall()
+
+            return output[0]
+
+
 conn = sql.connect(config.db_file, detect_types=sql.PARSE_DECLTYPES)
 c = conn.cursor()
 
@@ -256,7 +356,19 @@ c.execute('''CREATE TABLE IF NOT EXISTS user_data
                         days text,
                         time text,
                         state text)''')
+c.execute('''CREATE TABLE IF NOT EXISTS user_keyboards
+                        (id text,
+                         lanc_search integer,
+                         lanc_sub integer,
+                         monday integer,
+                         tuesday integer,
+                         wednesday integer,
+                         thursday integer,
+                         friday integer,
+                         saturday integer,
+                         sunday integer)''')
 
 conn.commit()
 conn.close()
+# add_user('123')
 # TODO: add scheduling functionality

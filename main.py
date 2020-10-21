@@ -86,11 +86,15 @@ class Keyboard(object):
 
     """
     tick = '✓'
+    id = 0
 
-    def __init__(self, buttons, keyb_type='day selection'):
-        self.button_names = buttons
+    def __init__(self, passed_buttons, keyb_type='day selection'):
+        self.button_names = passed_buttons
         self.button_names = [*self.button_names, 'Select All']
         self.keyb_type = keyb_type
+        self.id = Keyboard.id
+        Keyboard.id += 1
+        print(f'created instance {self.id}')
 
     def generate_markup(self):
         self.markup = types.InlineKeyboardMarkup()
@@ -118,7 +122,7 @@ class Keyboard(object):
 
     def switch_button(self, text):
         """Marks button with passed [text] on/off, uses tick sign as a mark."""
-        print(f'current buttons = {self.button_names[0]}. call = {text}')
+        print(f'current buttons = {self.button_names[0]}. call = {text}. instance = {self.id}')
         key_number = self.button_names.index(text)
         # This first clause checks if the key 'Select All'
         # was pressed. This key is last on the list of key names.
@@ -190,7 +194,7 @@ def unsub(message):
 @bot.message_handler(commands=['subscribe'])
 def subscribe(message):
     kbd_buttons = ['Lancet']
-    sub_keyboard = Keyboard(kbd_buttons, keyb_type='journals')
+    sub_keyboard = Keyboard(kbd_buttons, keyb_type='journal selection')
     markup = sub_keyboard.generate_markup()
     bot.send_message(message.chat.id,
                      'Select relevant journals.\nP.S. I can only look in The '
@@ -203,7 +207,7 @@ def subscribe(message):
     # warnings. Thank you, stackoverflow!
     @bot.callback_query_handler(func=lambda call: True
                                 and call.data != 'Continue')
-    def _switch_button(call):
+    def _switch_button_sub(call):
         day = call.data
         sub_keyboard.switch_button(day)
         new_markup = sub_keyboard.generate_markup()
@@ -213,7 +217,7 @@ def subscribe(message):
 
     @bot.callback_query_handler(func=lambda call: True
                                 and call.data == 'Continue')
-    def _cont(call):
+    def _cont_sub(call):
         selected_journals = sub_keyboard.selected_buttons()
         if not selected_journals:
             bot.send_message(call.message.chat.id,
@@ -257,12 +261,28 @@ def get_time(message):
                                   'successfully subscribed!')
 
 
+def generate_keyboard_markup(user_id, keyb_type, req_type):
+    if req_type == 'search':
+        markup = types.InlineKeyboardMarkup()
+        button_state = db.get_keyboard(user_id, keyb_type, req_type)
+        lancet_button = types.InlineKeyboardButton(
+                                text='The Lancet',
+                                callback_data=f'lanc_search_{button_state}')
+        continue_button = types.InlineKeyboardButton(
+                                text='Continue',
+                                callback_data=f'cont_search')
+        markup.row(lancet_button)
+        markup.row(continue_button)
+    if req_type == 'sub':
+        if keyb_type == 'days':
+            markup = types.InlineKeyboardMarkup()
+            button_state = db.get_keyboard(user_id, keyb_type, req_type)
+            print(button_state)
+            
+
 @bot.message_handler(commands=['search'])
 def search(message):
-    kbd_buttons = ['Lancet']
-    search_keyboard = Keyboard(kbd_buttons, keyb_type='journals')
-    print(f'generated new board. btn = {search_keyboard.button_names[0]}')
-    markup = search_keyboard.generate_markup()
+    markup = generate_journal_markup()
     bot.send_message(message.chat.id,
                      'Select relevant journals.\nP.S. I can only look in The '
                      'Lancet at the moment, but I promise to become more'
@@ -273,7 +293,7 @@ def search(message):
     @bot.callback_query_handler(func=lambda call: True
                                 and call.data != 'Continue')
     def _switch_button(call):
-        print(f'call data = {call.data}')
+        print(f'call data = {call.data} instance = {search_keyboard.id}')
         search_keyboard.switch_button(call.data)
         new_markup = search_keyboard.generate_markup()
         bot.edit_message_reply_markup(call.message.chat.id,
