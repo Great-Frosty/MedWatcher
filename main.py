@@ -118,8 +118,8 @@ class Keyboard(object):
 
     def switch_button(self, text):
         """Marks button with passed [text] on/off, uses tick sign as a mark."""
+        print(self.key_names)
         key_number = self.key_names.index(text.strip(self.tick))
-
         # This first clause checks if the key 'Select All'
         # was pressed. This key is last on the list of key names.
         if self.key_names[key_number] == self.key_names[-1]:
@@ -272,9 +272,7 @@ def search(message):
     @bot.callback_query_handler(func=lambda call: True
                                 and call.data != 'Continue')
     def _switch_button(call):
-        journal = call.data
-        print(journal)
-        keyboard.switch_button(journal)
+        keyboard.switch_button(call.data)
         new_markup = keyboard.generate_markup()
         bot.edit_message_reply_markup(call.message.chat.id,
                                       call.message.message_id,
