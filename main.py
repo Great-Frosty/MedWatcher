@@ -9,12 +9,13 @@ import re
 import telebot
 import logging
 import ssl
+from creds import token
 
 from aiohttp import web
 from telebot import types
 
 
-API_TOKEN = '1196869629:AAGWmpWV3hO8D-WCZKK4dz-ryew00XDCkTg'
+API_TOKEN = token
 
 WEBHOOK_HOST = '35.199.188.65'
 WEBHOOK_PORT = 8443  # 443, 80, 88 or 8443 (port need to be 'open')
@@ -45,11 +46,6 @@ async def handle(request):
 
 
 app.router.add_post('/{token}/', handle)
-
-logger = telebot.logger
-telebot.logger.setLevel(logging.INFO)
-
-bot = telebot.TeleBot(config.token)
 
 
 # Extends shedule, allows running jobs in parralel with infinity polling.
