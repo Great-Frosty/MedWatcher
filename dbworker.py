@@ -182,7 +182,7 @@ def set_user_terms(user_id, keywords, op_type, term):
     conn.close()
 
 
-def get_user_keywords(user_id, op_type):
+def get_keywords(user_id, op_type):
     '''Returns user's keywords.'''
 
     if op_type == 'SEARCH':
@@ -198,7 +198,7 @@ def get_user_keywords(user_id, op_type):
     return keywords[0]
 
 
-def get_user_journals(user_id, op_type):
+def get_journals(user_id, op_type):
     '''Returns user's journals.'''
 
     if op_type == 'SEARCH':
