@@ -6,3 +6,4 @@ medwatcher-wsp.code-workspace
 __pycache__/parser_lancet.cpython-38.pyc
 __pycache__/config.cpython-38.pyc
 __pycache__/dbworker.cpython-38.pyc
+creds.py
