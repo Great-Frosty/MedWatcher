@@ -45,7 +45,7 @@ def add_article(data):
     return no_errs
 
 
-def select_by_keywords(keywords, journals=['Lancet']):
+def articles_by_keywords(keywords, journals=['Lancet']):
     '''Returns a list of rows, that match search criteria. Keywords and
     journals to search must be supplied as lists.'''
 
@@ -62,9 +62,9 @@ def select_by_keywords(keywords, journals=['Lancet']):
                  INTO searchable_contents
                  SELECT name, journal, url, contents
                  FROM articles''')
-    
-    # try/except here is a hack. if user uses sqlite commands in his request - 
-    # the whole thing crashes. Instead of crashing it - we will simply return 
+
+    # try/except here is a hack. if user uses sqlite commands in his request -
+    # the whole thing crashes. Instead of crashing it - we will simply return
     # "bad request" message. Huzzah!
     try:
         results = c.execute('''SELECT name, url
@@ -75,14 +75,14 @@ def select_by_keywords(keywords, journals=['Lancet']):
                                 ORDER BY bm25(searchable_contents) DESC
                             )
                             WHERE journal MATCH ?
-                        ''', (keywords,journals,))
+                        ''', (keywords, journals,))
 
         output = results.fetchall()
         c.execute('''DELETE FROM searchable_contents''')
-        
+
         conn.commit()
         conn.close()
-    except:
+    except sql.OperationalError:
         output = []
     return output
 
@@ -128,7 +128,7 @@ def set_user_state(user_id, state):
     conn.close()
 
 
-def get_user_state(user_id):
+def get_state(user_id):
     '''Returns user state by id.'''
 
     conn = sql.connect(config.db_file)
@@ -160,7 +160,6 @@ def set_user_terms(user_id, keywords, op_type, term):
     elif op_type == 'SUB':
         insertion_column = f'{term.lower()}_subbed'
 
-
     conn = sql.connect(config.db_file)
     conn.execute('''UPDATE user_data
                     SET ''' + insertion_column + ''' = ?
@@ -177,11 +176,11 @@ def get_user_keywords(user_id, op_type):
         selected_column = 'keywords_searched'
     elif op_type == 'SUB':
         selected_column = 'keywords_subbed'
-    
+
     conn = sql.connect(config.db_file)
     res = conn.execute('''SELECT ''' + selected_column +
-                    ''' FROM user_data
-                    WHERE id = ?''', (user_id, ))
+                       ''' FROM user_data
+                          WHERE id = ?''', (user_id, ))
     keywords = res.fetchone()
     return keywords[0]
 
@@ -193,11 +192,11 @@ def get_user_journals(user_id, op_type):
         selected_column = 'journals_searched'
     elif op_type == 'SUB':
         selected_column = 'journals_subbed'
-    
+
     conn = sql.connect(config.db_file)
     res = conn.execute('''SELECT ''' + selected_column +
-                    ''' FROM user_data
-                    WHERE id = ?''', (user_id, ))
+                       ''' FROM user_data
+                          WHERE id = ?''', (user_id, ))
     keywords = res.fetchone()
     return keywords[0]
 
@@ -260,4 +259,4 @@ c.execute('''CREATE TABLE IF NOT EXISTS user_data
 
 conn.commit()
 conn.close()
-#TODO: add scheduling functionality
+# TODO: add scheduling functionality
