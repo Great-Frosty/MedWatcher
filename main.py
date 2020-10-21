@@ -404,9 +404,11 @@ def mailing_job(user_id):
     articles = collect_articles(user_id, 'SUB')
     send_articles(user_id, articles, 'SUB')
 
+
 def test_job(user_id):
     bot.send_message(user_id, 'Working!')
     print('Working!')
+
 
 def schedule_job(user_id):
     days = db.get_mailing_days(user_id).split(',')

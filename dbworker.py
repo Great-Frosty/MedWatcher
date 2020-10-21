@@ -16,8 +16,21 @@ def add_user(user_id):
     '''Adds a new user in the database.'''
 
     conn = sql.connect(config.db_file)
-    conn.execute('''INSERT INTO user_data (id)
-                    VALUES(?)''', (user_id,))
+    # conn.execute('''INSERT INTO user_data (id)
+    #                 VALUES(?)''', (user_id,))
+    conn.execute('''INSERT INTO user_keyboards (id)
+                    VALUES (?)''', (user_id, ))
+    conn.execute('''UPDATE user_keyboards
+                    SET lanc_search = ?,
+                            lanc_sub = ?,
+                            monday = ?,
+                            tuesday = ?,
+                            wednesday = ?,
+                            thursday = ?,
+                            friday = ?,
+                            saturday = ?,
+                            sunday = ?
+                    WHERE id = ?''', (0, 0, 0, 0, 0, 0, 0, 0, 0, user_id,))
     conn.commit()
     conn.close()
 
@@ -45,7 +58,7 @@ def add_article(data):
     return no_errs
 
 
-def select_by_keywords(keywords, journals=['Lancet']):
+def articles_by_keywords(keywords, journals=['Lancet']):
     '''Returns a list of rows, that match search criteria. Keywords and
     journals to search must be supplied as lists.'''
 
@@ -62,9 +75,9 @@ def select_by_keywords(keywords, journals=['Lancet']):
                  INTO searchable_contents
                  SELECT name, journal, url, contents
                  FROM articles''')
-    
-    # try/except here is a hack. if user uses sqlite commands in his request - 
-    # the whole thing crashes. Instead of crashing it - we will simply return 
+
+    # try/except here is a hack. if user uses sqlite commands in his request -
+    # the whole thing crashes. Instead of crashing it - we will simply return
     # "bad request" message. Huzzah!
     try:
         results = c.execute('''SELECT name, url
@@ -75,14 +88,14 @@ def select_by_keywords(keywords, journals=['Lancet']):
                                 ORDER BY bm25(searchable_contents) DESC
                             )
                             WHERE journal MATCH ?
-                        ''', (keywords,journals,))
+                        ''', (keywords, journals,))
 
         output = results.fetchall()
         c.execute('''DELETE FROM searchable_contents''')
-        
+
         conn.commit()
         conn.close()
-    except:
+    except sql.OperationalError:
         output = []
     return output
 
@@ -128,7 +141,7 @@ def set_user_state(user_id, state):
     conn.close()
 
 
-def get_user_state(user_id):
+def get_state(user_id):
     '''Returns user state by id.'''
 
     conn = sql.connect(config.db_file)
@@ -160,7 +173,6 @@ def set_user_terms(user_id, keywords, op_type, term):
     elif op_type == 'SUB':
         insertion_column = f'{term.lower()}_subbed'
 
-
     conn = sql.connect(config.db_file)
     conn.execute('''UPDATE user_data
                     SET ''' + insertion_column + ''' = ?
@@ -170,34 +182,34 @@ def set_user_terms(user_id, keywords, op_type, term):
     conn.close()
 
 
-def get_user_keywords(user_id, op_type):
+def get_keywords(user_id, op_type):
     '''Returns user's keywords.'''
 
     if op_type == 'SEARCH':
         selected_column = 'keywords_searched'
     elif op_type == 'SUB':
         selected_column = 'keywords_subbed'
-    
+
     conn = sql.connect(config.db_file)
     res = conn.execute('''SELECT ''' + selected_column +
-                    ''' FROM user_data
-                    WHERE id = ?''', (user_id, ))
+                       ''' FROM user_data
+                          WHERE id = ?''', (user_id, ))
     keywords = res.fetchone()
     return keywords[0]
 
 
-def get_user_journals(user_id, op_type):
+def get_journals(user_id, op_type):
     '''Returns user's journals.'''
 
     if op_type == 'SEARCH':
         selected_column = 'journals_searched'
     elif op_type == 'SUB':
         selected_column = 'journals_subbed'
-    
+
     conn = sql.connect(config.db_file)
     res = conn.execute('''SELECT ''' + selected_column +
-                    ''' FROM user_data
-                    WHERE id = ?''', (user_id, ))
+                       ''' FROM user_data
+                          WHERE id = ?''', (user_id, ))
     keywords = res.fetchone()
     return keywords[0]
 
@@ -242,6 +254,93 @@ def get_user_delivery_time(user_id):
     return time[0]
 
 
+def set_keyboard(user_id, keyb_type, req_type, callback):
+
+    button_name = callback[0]
+    button_state = callback[1]
+    # 'lanc_' + 'sub_' + 'callback'
+    conn = sql.connect(config.db_file)
+
+    if button_state == 0:
+        conn.execute('''UPDATE user_keyboards
+                        SET (? || ?) = ?
+                        WHERE id = ?''', (button_name, req_type, '1', user_id))
+    elif button_state == 1:
+        conn.execute('''UPDATE user_keyboards
+                        SET (? || ?) = ?
+                        WHERE id = ?''', (button_name, req_type, '0', user_id))
+    if button_state == 2:
+        if req_type == 'sub':
+            if keyb_type == 'days':
+                conn.execute('''UPDATE user_keyboards
+                                SET (monday,
+                                     tuesday,
+                                     wednesday,
+                                     thursday,
+                                     friday,
+                                     saturday,
+                                     sunday) = 0
+                                WHERE id = ?''', (user_id))
+            if keyb_type == 'journals':
+                conn.execute('''UPDATE user_keyboards
+                                SET lanc_sub = 0
+                                WHERE id = ?''', (user_id))
+
+        if req_type == 'search':
+            conn.execute('''UPDATE user_keyboards
+                            SET lanc_search = 0
+                            WHERE id = ?''', (user_id))
+    if button_state == 3:
+        if req_type == 'sub':
+            if keyb_type == 'days':
+                conn.execute('''UPDATE user_keyboards
+                                SET (monday,
+                                     tuesday,
+                                     wednesday,
+                                     thursday,
+                                     friday,
+                                     saturday,
+                                     sunday) = 1
+                                WHERE id = ?''', (user_id))
+            if keyb_type == 'journals':
+                conn.execute('''UPDATE user_keyboards
+                                SET lanc_sub = 1
+                                WHERE id = ?''', (user_id))
+
+        if req_type == 'search':
+            conn.execute('''UPDATE user_keyboards
+                            SET lanc_search = 1
+                            WHERE id = ?''', (user_id))        
+
+    conn.commit()
+    conn.close()
+
+
+def get_keyboard(user_id, keyb_type, req_type):
+    conn = sql.connect(config.db_file)
+    if req_type == 'search':
+        curs = conn.execute('''SELECT lanc_search
+                               FROM user_keyboards
+                               WHERE id = ?''', (user_id, ))
+        output = curs.fetchone()[0]
+        return output
+
+    if req_type == 'sub':
+        if keyb_type == 'journals':
+            conn.execute('''SELECT lanc_sub
+                            FROM user_keyboards
+                            WHERE id = ?''', (user_id, ))
+            output = curs.fetchone()[0]
+            return output
+
+        if keyb_type == 'days':
+            curs = conn.execute('''SELECT monday, tuesday, wednesday, thursday, friday, saturday, sunday
+                            FROM user_keyboards''')
+            output = curs.fetchall()
+
+            return output[0]
+
+
 conn = sql.connect(config.db_file, detect_types=sql.PARSE_DECLTYPES)
 c = conn.cursor()
 
@@ -257,7 +356,18 @@ c.execute('''CREATE TABLE IF NOT EXISTS user_data
                         days text,
                         time text,
                         state text)''')
+c.execute('''CREATE TABLE IF NOT EXISTS user_keyboards
+                        (id text,
+                         lanc_search integer,
+                         lanc_sub integer,
+                         monday integer,
+                         tuesday integer,
+                         wednesday integer,
+                         thursday integer,
+                         friday integer,
+                         saturday integer,
+                         sunday integer)''')
 
 conn.commit()
 conn.close()
-#TODO: add scheduling functionality
+# TODO: add scheduling functionality
