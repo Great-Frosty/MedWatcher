@@ -80,21 +80,18 @@ class JobRunner(schedule.Scheduler):
 job_keeper = JobRunner()
 
 
-# Change days to buttons and it becomes a good abstract for journals too.
 class Keyboard(object):
     """Keyboard is responsible for creating markups, switching buttons on/off
     and passing selected buttons further down the line.
 
     """
-
     tick = '✓'
 
-    def __init__(self, key_names):
-
+    def __init__(self, key_names, keyb_type='day selection'):
         self.key_names = key_names
+        self.keyb_type = keyb_type
 
     def generate_markup(self):
-
         self.markup = types.InlineKeyboardMarkup()
 
         # generates keys from key names passed during __init__.
@@ -106,10 +103,16 @@ class Keyboard(object):
         self.cont_key = types.InlineKeyboardButton(text='Continue',
                                                    callback_data='Continue'
                                                    )
-        self.markup.row(*self.keys[:4])
-        self.markup.row(*self.keys[4:])
-        self.markup.row(self.cont_key)
-        return self.markup
+
+        if self.keyb_type == 'days':
+            self.markup.row(*self.keys[:4])
+            self.markup.row(*self.keys[4:])
+            self.markup.row(self.cont_key)
+            return self.markup
+        elif self.keyb_type == 'journals':
+            self.markup.row(*self.keys)
+            self.markup.row(self.cont_key)
+            return self.markup
 
     def switch_button(self, text):
         """Marks button with passed [text] on/off, uses tick sign as a mark."""
@@ -185,22 +188,15 @@ def unsub(message):
 @bot.message_handler(commands=['subscribe'])
 def subscribe(message):
 
-    kbd_buttons = [
-                'Monday',
-                'Tuesday',
-                'Wednesday',
-                'Thursday',
-                'Friday',
-                'Saturday',
-                'Sunday',
-                'Select All'
-                ]
-    keyboard = Keyboard(kbd_buttons)
+    kbd_buttons = ['Lancet']
+    keyboard = Keyboard(kbd_buttons, keyb_type='journals')
     markup = keyboard.generate_markup()
-    bot.send_message(message.chat.id, 'Select days', reply_markup=markup)
-    db.set_user_state(
-        message.chat.id, sts.S_SUB.value
-        )
+    bot.send_message(message.chat.id,
+                     'Select relevant journals.\nP.S. I can only look in The '
+                     'Lancet at the moment, but I promise to become more'
+                     ' diligent in the future.',
+                     reply_markup=markup)
+    db.set_user_state(message.chat.id, sts.S_SUB.value)
 
     # Starting a function name with an underscore disables "Unused variable"
     # warnings. Thank you, stackoverflow!
@@ -217,24 +213,21 @@ def subscribe(message):
     @bot.callback_query_handler(func=lambda call: True
                                 and call.data == 'Continue')
     def _cont(call):
-        selected_days = keyboard.selected_buttons()
-        if selected_days:
+        selected_journals = keyboard.selected_buttons()
+        if not selected_journals:
+            bot.send_message(call.message.chat.id,
+                             'Please select at least one journal.')
+        else:
             db.set_user_state(call.message.chat.id,
-                              sts.S_SUB_DAYS.value)
-
-            db.set_mailing_days(
-                             call.message.chat.id, ','.join(selected_days))
+                              sts.S_SUB_JOURNALS.value)
+            db.set_user_terms(call.message.chat.id,
+                              ','.join(selected_journals),
+                              'SUB', 'JOURNALS')
             bot.send_message(call.message.chat.id,
                              'We are on track! '
-                             'Next order of business - time. '
-                             'To simplify the whole ordeal - '
-                             'just send me one number from 0 to 23 '
-                             '- that would be the hour of day at '
-                             'which you would want to recieve your '
-                             'articles.')
-        else:
-            bot.send_message(call.message.chat.id,
-                             'Please select at least one day.')
+                             'Now let\'s figure out what keywords we\'re '
+                             'looking for. You can send me more that one '
+                             'keyword, just separate them with spaces.')
 
 
 @bot.message_handler(
@@ -244,38 +237,70 @@ def subscribe(message):
                                              '/help',
                                              '/unsub'))
 def get_time(message):
+    user_id = message.chat.id
     time = message.text.strip()
     if not time.isnumeric():
-        bot.send_message(message.chat.id, 'That\'s not a very good input. '
-                                          'I only need a time of day '
-                                          'right now. One number from 0 to 23 '
-                                          'will do nicely.')
+        bot.send_message(user_id, 'That\'s not a very good input. '
+                                  'I only need a time of day '
+                                  'right now. One number from 0 to 23 '
+                                  'will do nicely.')
     elif int(time) not in range(24):
-        bot.send_message(message.chat.id, 'So close! It\'s now a number, '
-                                          'but it\'s still not in 0-23 range. '
-                                          'Another try maybe?')
+        bot.send_message(user_id, 'So close! It\'s now a number, '
+                                  'but it\'s still not in 0-23 range. '
+                                  'Another try maybe?')
     else:
-        db.set_user_delivery_time(message.chat.id, time)
-        bot.send_message(message.chat.id, 'Great! Now send me the keywords, '
-                                          'you want to track.')
-        db.set_user_state(message.chat.id, sts.S_SUB_TIME.value)
+        db.set_user_delivery_time(user_id, time)
+        exec(f'job_keeper.clear({user_id})')
+        schedule_job(user_id)
+        bot.send_message(user_id, 'Great! You have '
+                                  'successfully subscribed!')
 
 
 @bot.message_handler(commands=['search'])
 def search(message):
-    bot.send_message(
-                    message.chat.id,
-                    'Ait. Now just type in keywords you want me to look for.'
-                    '\nSend them like you normally would – '
-                    'separated by a spacebar.'
-                    )
 
+    kbd_buttons = ['Lancet']
+    keyboard = Keyboard(kbd_buttons, keyb_type='journals')
+    markup = keyboard.generate_markup()
+    bot.send_message(message.chat.id,
+                     'Select relevant journals.\nP.S. I can only look in The '
+                     'Lancet at the moment, but I promise to become more'
+                     ' diligent in the future.',
+                     reply_markup=markup)
     db.set_user_state(message.chat.id, sts.S_SEARCH.value)
+
+    @bot.callback_query_handler(func=lambda call: True
+                                and call.data != 'Continue')
+    def _switch_button(call):
+        journal = call.data
+        keyboard.switch_button(journal)
+        new_markup = keyboard.generate_markup()
+        bot.edit_message_reply_markup(call.message.chat.id,
+                                      call.message.message_id,
+                                      reply_markup=new_markup)
+
+    @bot.callback_query_handler(func=lambda call: True
+                                and call.data == 'Continue')
+    def _cont(call):
+        selected_journals = keyboard.selected_buttons()
+        if selected_journals:
+            db.set_user_state(call.message.chat.id,
+                              sts.S_SEARCH_JOURNALS.value)
+            db.set_user_terms(call.message.chat.id,
+                              ','.join(selected_journals),
+                              'SEARCH', 'JOURNALS')
+            bot.send_message(call.message.chat.id,
+                             'Great!\n'
+                             'Now send me the keywords you want to '
+                             'look for.')
+        else:
+            bot.send_message(call.message.chat.id,
+                             'Please select at least one journal.')
 
 
 @bot.message_handler(
-    func=lambda message: db.get_state(message.chat.id) == sts.S_SEARCH.value
-    or db.get_state(message.chat.id) == sts.S_SUB_TIME.value
+    func=lambda message: db.get_state(message.chat.id) == sts.S_SEARCH_JOURNALS.value
+    or db.get_state(message.chat.id) == sts.S_SUB_JOURNALS.value
     and message.text.strip().lower() not in ('/search',
                                              '/subscribe',
                                              '/help',
@@ -294,9 +319,9 @@ def get_keywords(message):
                              ' remember you.'
         )
     else:
-        user_state = db.get_state(message.chat.id)
+        user_state = db.get_state(user_id)
         keywords_type = ''
-        if user_state == sts.S_SEARCH.value:
+        if user_state == sts.S_SEARCH_JOURNALS.value:
             keywords_type = 'SEARCH'
         elif user_state == sts.S_SUB_TIME.value:
             keywords_type = 'SUB'
@@ -304,13 +329,77 @@ def get_keywords(message):
         db.set_user_terms(user_id,
                           strpd_text, keywords_type, 'KEYWORDS')
         bot.send_message(user_id,
-                         'Nice! Now send me the names of the journals you want'
+                         'Nice! Now select the names of the journals you want'
                          ' me to look in. Sadly at moment I can only look for'
                          ' things in one journal - "Lancet". But I promise to'
                          ' become more diligent in the future. '
                          )
         next_state = f'sts.S_{keywords_type}_KEYWORDS.value'
         exec(f'db.set_user_state(user_id, {next_state})')
+
+        if keywords_type == 'SEARCH':
+            collected_articles = collect_articles(user_id, keywords_type)
+            send_articles(user_id, collected_articles, keywords_type)
+            db.set_user_state(user_id, sts.S_START.value)
+
+        elif keywords_type == 'SUB':
+            user_keywords = db.get_user_keywords(user_id, 'SUB').split()
+            user_journals = db.get_user_journals(user_id, 'SUB').split()
+
+            collected_data = db.articles_by_keywords(user_keywords,
+                                                     user_journals)
+            if not collected_data:
+                bot.send_message(user_id, 'Fair warning:\nI have no  '
+                                          'matches with those keywords'
+                                          ' in my archive. Your '
+                                          'subscription probably won\'t'
+                                          'yield any results.')
+            else:
+                kbd_buttons = ['Monday',
+                               'Tuesday',
+                               'Wednesday',
+                               'Thursday',
+                               'Friday',
+                               'Saturday',
+                               'Sunday',
+                               'Select All']
+
+                keyboard = Keyboard(kbd_buttons, keyb_type='days')
+                markup = keyboard.generate_markup()
+                bot.send_message(user_id,
+                                 'Select delivery days',
+                                 reply_markup=markup)
+                db.set_user_state(user_id, sts.S_SUB_DAYS.value)
+
+                @bot.callback_query_handler(func=lambda call: True
+                                            and call.data != 'Continue')
+                def _switch_button(call):
+                    day = call.data
+                    keyboard.switch_button(day)
+                    new_markup = keyboard.generate_markup()
+                    bot.edit_message_reply_markup(user_id,
+                                                  call.message.message_id,
+                                                  reply_markup=new_markup)
+
+                @bot.callback_query_handler(func=lambda call: True
+                                            and call.data == 'Continue')
+                def _cont(call):
+                    selected_days = keyboard.selected_buttons()
+                    if selected_days:
+                        db.set_user_state(call.message.chat.id,
+                                          sts.S_SUB_DAYS.value)
+                        db.set_mailing_days(user_id, selected_days)
+                        bot.send_message(call.message.chat.id,
+                                         'Great!\n'
+                                         'Now let\'s deal with delivery time.'
+                                         'I\'ll accept the number from 0 to 23'
+                                         'representing an hour of day '
+                                         'at which you want to recieve the '
+                                         'delivery.')
+                    else:
+                        bot.send_message(call.message.chat.id,
+                                         'Please select at least'
+                                         ' one delivery day.')
 
 
 @bot.message_handler(
@@ -328,81 +417,21 @@ def handle_random_message(message):
                 )
 
 
-# This one is just awful. fix it!
-# Actually, journal selection screen should be a keyboard
-# and it should be before keywords.
-# And the bot should talk less in general.
-@bot.message_handler(
-    func=lambda msg: db.get_state(msg.chat.id) == sts.S_SEARCH_KEYWORDS.value
-    or db.get_state(msg.chat.id) == sts.S_SUB_KEYWORDS.value
-    and msg.text.strip().lower() not in ('/search',
-                                         '/subscribe',
-                                         '/help',
-                                         '/unsub'))
-def get_journals(msg):
-    strpd_text = msg.text.strip(',;_\'"').lower()
-    user_id = msg.chat.id
-
-    if strpd_text not in ['lancet']:
-        if not re.search('[a-zA-z]', strpd_text):
-            bot.send_message(user_id,
-                             'I\'m pretty sure no journal in the world is '
-                             'named like that. A letter is worth a thousand '
-                             'numbers in this case.\n'
-                             'If you\'re somehow stuck - just do a new /search'
-                             ' or even /start, I promise, I will still '
-                             ' remember you.')
-        else:
-            bot.send_message(user_id, 'Cmon man, just type in "lancet"')
-    else:
-        user_state = db.get_state(user_id)
-        keywords_type = ''
-        if user_state == sts.S_SEARCH_KEYWORDS.value:
-            keywords_type = 'SEARCH'
-        elif user_state == sts.S_SUB_KEYWORDS.value:
-            keywords_type = 'SUB'
-
-        db.set_user_terms(user_id, strpd_text, keywords_type, 'JOURNALS')
-        next_state = f'sts.S_{keywords_type}_JOURNALS.value'
-        exec(f'db.set_user_state(user_id, {next_state})')
-
-        if db.get_state(user_id) == sts.S_SEARCH_JOURNALS.value:
-            collect_and_send(user_id, keywords_type)
-            db.set_user_state(user_id, sts.S_START.value)
-
-        elif db.get_state(user_id) == sts.S_SUB_JOURNALS.value:
-            user_keywords = db.get_user_keywords(user_id, 'SUB').split()
-            user_journals = db.get_user_journals(user_id, 'SUB').split()
-
-            collected_data = db.articles_by_keywords(user_keywords,
-                                                     user_journals)
-            if not collected_data:
-                bot.send_message(user_id, 'Fair warning:\nI have no  '
-                                          'matches with those keywords'
-                                          ' in my archive. Your '
-                                          'subscription probably won\'t'
-                                          'yield any results.')
-            else:
-                schedule_job(user_id)
-                bot.send_message(user_id, 'Great! You have '
-                                          'successfully subscribed!')
-                db.set_user_state(user_id, sts.S_START.value)
-
-
-def collect_and_send(user_id, op_type):
+def collect_articles(user_id, op_type):
     user_keywords = db.get_user_keywords(user_id, op_type).split()
     user_journals = db.get_user_journals(user_id, op_type).split()
 
     collected_data = db.articles_by_keywords(user_keywords, user_journals)
+    return collected_data
 
-    if not collected_data:
-        bot.send_message(
-            user_id, 'Sorry, i can\'t find what you you\'re looking for.'
-            )
 
+def send_articles(user_id, articles, op_type):
+    data_to_send = articles
+    if not data_to_send:
+        bot.send_message(user_id,
+                         'Sorry, i can\'t find what you you\'re looking for.')
     else:
-        formatted_data = format(collected_data)
-
+        formatted_data = format(data_to_send)
         for part in formatted_data:
             text = '\n\n'.join(part)
             bot.send_message(user_id, text,
@@ -432,9 +461,8 @@ def parts(lst, n=5):
 
 
 def mailing_job(user_id):
-    # collect_and_send(user_id, 'SUB')
-    bot.send_message(user_id, 'Working!')
-    print('working')
+    articles = collect_articles(user_id, 'SUB')
+    send_articles(user_id, articles, 'SUB')
 
 
 def schedule_job(user_id):
@@ -449,19 +477,8 @@ def schedule_job(user_id):
     for d in days:
 
         day = d.lower()
-        # job_string =
-        # f'job_keeper.every().{day}.at("{delivery_time}")
-        # .do(mailing_job, user_id={user_id}).tag("{user_id}")'
-        job_string = f'''
-                job_keeper.every().{day}.at("{delivery_time}")
-                .do(mailing_job, user_id={user_id}).tag("{user_id}")
-                '''
-
-        print(job_string)
-    exec(f'''job_keeper.every().second
-             .do(mailing_job,user_id={user_id}).tag("{user_id}"
-          ''')
-    print('\nthis also works')
+        job_string = f'job_keeper.every().{day}.at("{delivery_time}").do(mailing_job, user_id={user_id}).tag("{user_id}")'
+        exec(job_string)
 
 
 # Remove webhook, it fails sometimes the set if there is a previous webhook
@@ -474,23 +491,20 @@ bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
 # Build ssl context
 context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
 context.load_cert_chain(WEBHOOK_SSL_CERT, WEBHOOK_SSL_PRIV)
-# bot.infinity_polling()
 # Start aiohttp server
-web.run_app(
-    app,
-    host=WEBHOOK_LISTEN,
-    port=WEBHOOK_PORT,
-    ssl_context=context,
-)
 
 
 parsing_thread = threading.Thread(target=parser_lancet.check_updates,
                                   daemon=True)
 job_keeper.every(6).hours.do(parsing_thread.start)
-
 running_keeper = job_keeper.run_continuously()
 try:
-    time.sleep(.1)
+    web.run_app(
+                app,
+                host=WEBHOOK_LISTEN,
+                port=WEBHOOK_PORT,
+                ssl_context=context,
+                )
 except KeyboardInterrupt:
     running_keeper.set()
     parsing_thread.join()
