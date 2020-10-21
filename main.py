@@ -404,6 +404,9 @@ def mailing_job(user_id):
     articles = collect_articles(user_id, 'SUB')
     send_articles(user_id, articles, 'SUB')
 
+def test_job(user_id):
+    bot.send_message(user_id, 'Working!')
+    print('Working!')
 
 def schedule_job(user_id):
     days = db.get_mailing_days(user_id).split(',')
@@ -419,7 +422,7 @@ def schedule_job(user_id):
 
         day = d.lower()
         job_string = f'job_keeper.every().{day}.at("{delivery_time}").do(mailing_job, user_id={user_id}).tag("{user_id}")'
-        exec(job_string)
+    exec(job_string)
 
 
 # Remove webhook, it fails sometimes the set if there is a previous webhook
