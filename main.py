@@ -29,7 +29,7 @@ WEBHOOK_URL_PATH = "/{}/".format(API_TOKEN)
 logger = telebot.logger
 telebot.logger.setLevel(logging.INFO)
 
-bot = telebot.TeleBot(API_TOKEN)
+bot = telebot.TeleBot(API_TOKEN, threaded=False)
 
 app = web.Application()
 
@@ -407,27 +407,27 @@ def schedule_job(user_id):
 
 
 # Remove webhook, it fails sometimes the set if there is a previous webhook
-# bot.remove_webhook()
+bot.remove_webhook()
 
 # Set webhook
-# bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
-#                 certificate=open(WEBHOOK_SSL_CERT, 'r'))
+bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
+                certificate=open(WEBHOOK_SSL_CERT, 'r'))
 
 # Build ssl context
 context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
 context.load_cert_chain(WEBHOOK_SSL_CERT, WEBHOOK_SSL_PRIV)
-bot.infinity_polling()
+# bot.infinity_polling()
 # Start aiohttp server
-# web.run_app(
-#     app,
-#     host=WEBHOOK_LISTEN,
-#     port=WEBHOOK_PORT,
-#     ssl_context=context,
-# )
+web.run_app(
+    app,
+    host=WEBHOOK_LISTEN,
+    port=WEBHOOK_PORT,
+    ssl_context=context,
+)
 
 
 parsing_thread = threading.Thread(target=parser_lancet.check_updates, daemon=True)
-job_keeper.every(6).hours.do(parsing_thread.start())
+job_keeper.every(6).hours.do(parsing_thread.start)
 
 running_keeper = job_keeper.run_continuously()
 try:
