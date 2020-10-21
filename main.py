@@ -5,6 +5,7 @@ import time
 import dbworker
 import parser_lancet
 import threading
+import re
 import telebot
 import logging
 import ssl
@@ -22,14 +23,6 @@ WEBHOOK_LISTEN = '0.0.0.0'  # In some VPS you may need to put here the IP addr
 WEBHOOK_SSL_CERT = 'ssh/url_cert.pem'  # Path to the ssl certificate
 WEBHOOK_SSL_PRIV = 'ssh/url_private.key'  # Path to the ssl private key
 
-# Quick'n'dirty SSL certificate generation:
-#
-# openssl genrsa -out webhook_pkey.pem 2048
-# openssl req -new -x509 -days 3650 -key webhook_pkey.pem -out webhook_cert.pem
-#
-# When asked for "Common Name (e.g. server FQDN or YOUR name)" you should reply
-# with the same value in you put in WEBHOOK_HOST
-
 WEBHOOK_URL_BASE = "https://{}:{}".format(WEBHOOK_HOST, WEBHOOK_PORT)
 WEBHOOK_URL_PATH = "/{}/".format(API_TOKEN)
 
@@ -39,7 +32,6 @@ telebot.logger.setLevel(logging.INFO)
 bot = telebot.TeleBot(API_TOKEN)
 
 app = web.Application()
-
 
 # Process webhook calls
 async def handle(request):
@@ -58,6 +50,7 @@ logger = telebot.logger
 telebot.logger.setLevel(logging.INFO)
 
 bot = telebot.TeleBot(config.token)
+
 
 # Extends shedule, allows running jobs in parralel with infinity polling.
 class JobRunner(schedule.Scheduler):
@@ -82,6 +75,7 @@ class JobRunner(schedule.Scheduler):
 
 job_keeper = JobRunner()
 
+# Chanhe days to buttons and it becomes a good abstract for journals too.
 class Keyboard(object):
 
     tick = '✓'
@@ -291,6 +285,9 @@ def unsub(message):
 
 
 # This one is just awful. fix it!
+# Actually, journal selection screen should be a keyboard
+# and it should be before keywords.
+# And the bot should talk less in general.
 @bot.message_handler(
     func=lambda message: dbworker.get_user_state(message.chat.id) == config.States.S_SEARCH_KEYWORDS.value
     or dbworker.get_user_state(message.chat.id) == config.States.S_SUB_KEYWORDS.value 
@@ -410,23 +407,23 @@ def schedule_job(user_id):
 
 
 # Remove webhook, it fails sometimes the set if there is a previous webhook
-bot.remove_webhook()
+# bot.remove_webhook()
 
 # Set webhook
-bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
-                certificate=open(WEBHOOK_SSL_CERT, 'r'))
+# bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
+#                 certificate=open(WEBHOOK_SSL_CERT, 'r'))
 
 # Build ssl context
 context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
 context.load_cert_chain(WEBHOOK_SSL_CERT, WEBHOOK_SSL_PRIV)
-
+bot.infinity_polling()
 # Start aiohttp server
-web.run_app(
-    app,
-    host=WEBHOOK_LISTEN,
-    port=WEBHOOK_PORT,
-    ssl_context=context,
-)
+# web.run_app(
+#     app,
+#     host=WEBHOOK_LISTEN,
+#     port=WEBHOOK_PORT,
+#     ssl_context=context,
+# )
 
 
 parsing_thread = threading.Thread(target=parser_lancet.check_updates, daemon=True)

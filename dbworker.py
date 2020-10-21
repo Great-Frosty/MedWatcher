@@ -3,6 +3,25 @@ import json
 import config
 
 
+def check_if_user_exists(user_id):
+
+    conn = sql.connect(config.db_file)
+    result = conn.execute('''SELECT id
+                             FROM user_data
+                             WHERE id = ?''', (user_id,))
+    return bool(result.fetchone())
+
+
+def add_user(user_id):
+    '''Adds a new user in the database.'''
+
+    conn = sql.connect(config.db_file)
+    conn.execute('''INSERT INTO user_data (id)
+                    VALUES(?)''', (user_id,))
+    conn.commit()
+    conn.close()
+
+
 def add_article(data):
     """Inserts parsed article data and some meta information into the db.
     Data must come in a following format:
@@ -221,25 +240,6 @@ def get_user_delivery_time(user_id):
                     WHERE id = ?''', (user_id,))
     time = res.fetchone()
     return time[0]
-
-
-def add_user(user_id):
-    '''Adds a new user in the database.'''
-
-    conn = sql.connect(config.db_file)
-    conn.execute('''INSERT INTO user_data (id)
-                    VALUES(?)''', (user_id,))
-    conn.commit()
-    conn.close()
-
-
-def check_if_user_exists(user_id):
-
-    conn = sql.connect(config.db_file)
-    result = conn.execute('''SELECT id
-                             FROM user_data
-                             WHERE id = ?''', (user_id,))
-    return bool(result.fetchone())
 
 
 conn = sql.connect(config.db_file, detect_types=sql.PARSE_DECLTYPES)
