@@ -424,7 +424,7 @@ def schedule_job(user_id):
 
         day = d.lower()
         job_string = f'job_keeper.every().{day}.at("{delivery_time}").do(mailing_job, user_id={user_id}).tag("{user_id}")'
-    exec(job_string)
+        exec(job_string)
 
 
 # Remove webhook, it fails sometimes the set if there is a previous webhook
