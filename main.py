@@ -87,20 +87,20 @@ class Keyboard(object):
     """
     tick = '✓'
 
-    def __init__(self, key_names, keyb_type='day selection'):
-        self.key_names = key_names
-        self.key_names = [*self.key_names, 'Select All']
+    def __init__(self, buttons, keyb_type='day selection'):
+        self.button_names = buttons
+        self.button_names = [*self.button_names, 'Select All']
         self.keyb_type = keyb_type
-        print(f'New keyboard:\n{self.key_names}')
 
     def generate_markup(self):
         self.markup = types.InlineKeyboardMarkup()
 
         # generates keys from key names passed during __init__.
         self.keys = []
-        for key_name in self.key_names:
-            self.keys.append(types.InlineKeyboardButton(text=key_name,
-                                                        callback_data=key_name)
+        for button_name in self.button_names:
+            self.keys.append(types.InlineKeyboardButton(
+                                                    text=button_name,
+                                                    callback_data=button_name)
                              )
         self.cont_key = types.InlineKeyboardButton(text='Continue',
                                                    callback_data='Continue'
@@ -118,31 +118,31 @@ class Keyboard(object):
 
     def switch_button(self, text):
         """Marks button with passed [text] on/off, uses tick sign as a mark."""
-        print(self.key_names)
-        key_number = self.key_names.index(text.strip(self.tick))
+        print(f'current buttons = {self.button_names[0]}. call = {text}')
+        key_number = self.button_names.index(text)
         # This first clause checks if the key 'Select All'
         # was pressed. This key is last on the list of key names.
-        if self.key_names[key_number] == self.key_names[-1]:
+        if self.button_names[key_number] == self.button_names[-1]:
             # This case handles the 'Select All' state.
-            if self.key_names[-1].startswith('Select'):
-                for i, text in enumerate(self.key_names[:-1]):
-                    self.key_names[i] = text.strip(self.tick)
-                    self.key_names[i] = self.key_names[i] + self.tick
-                self.key_names[-1] = 'Deselect All'
+            if self.button_names[-1].startswith('Select'):
+                for i, text in enumerate(self.button_names[:-1]):
+                    self.button_names[i] = text.strip(self.tick)
+                    self.button_names[i] = self.button_names[i] + self.tick
+                self.button_names[-1] = 'Deselect All'
             # This one is for 'Deselect All'.
             else:
-                for i, text in enumerate(self.key_names[:-1]):
-                    self.key_names[i] = text.strip(self.tick)
-                self.key_names[-1] = 'Select All'
+                for i, text in enumerate(self.button_names[:-1]):
+                    self.button_names[i] = text.strip(self.tick)
+                self.button_names[-1] = 'Select All'
 
-        elif self.key_names[key_number].endswith(self.tick):
-            self.key_names[key_number] = self.key_names[key_number][:-1]
+        elif self.button_names[key_number].endswith(self.tick):
+            self.button_names[key_number] = self.button_names[key_number][:-1]
         else:
-            self.key_names[key_number] = text + self.tick
+            self.button_names[key_number] = text + self.tick
 
     def selected_buttons(self):
         selected = []
-        for btn in self.key_names[:-1]:
+        for btn in self.button_names[:-1]:
             if btn.endswith(self.tick):
                 selected.append(btn[:].strip(self.tick))
         return selected
@@ -190,8 +190,8 @@ def unsub(message):
 @bot.message_handler(commands=['subscribe'])
 def subscribe(message):
     kbd_buttons = ['Lancet']
-    keyboard = Keyboard(kbd_buttons, keyb_type='journals')
-    markup = keyboard.generate_markup()
+    sub_keyboard = Keyboard(kbd_buttons, keyb_type='journals')
+    markup = sub_keyboard.generate_markup()
     bot.send_message(message.chat.id,
                      'Select relevant journals.\nP.S. I can only look in The '
                      'Lancet at the moment, but I promise to become more'
@@ -205,8 +205,8 @@ def subscribe(message):
                                 and call.data != 'Continue')
     def _switch_button(call):
         day = call.data
-        keyboard.switch_button(day)
-        new_markup = keyboard.generate_markup()
+        sub_keyboard.switch_button(day)
+        new_markup = sub_keyboard.generate_markup()
         bot.edit_message_reply_markup(call.message.chat.id,
                                       call.message.message_id,
                                       reply_markup=new_markup)
@@ -214,7 +214,7 @@ def subscribe(message):
     @bot.callback_query_handler(func=lambda call: True
                                 and call.data == 'Continue')
     def _cont(call):
-        selected_journals = keyboard.selected_buttons()
+        selected_journals = sub_keyboard.selected_buttons()
         if not selected_journals:
             bot.send_message(call.message.chat.id,
                              'Please select at least one journal.')
@@ -260,8 +260,9 @@ def get_time(message):
 @bot.message_handler(commands=['search'])
 def search(message):
     kbd_buttons = ['Lancet']
-    keyboard = Keyboard(kbd_buttons, keyb_type='journals')
-    markup = keyboard.generate_markup()
+    search_keyboard = Keyboard(kbd_buttons, keyb_type='journals')
+    print(f'generated new board. btn = {search_keyboard.button_names[0]}')
+    markup = search_keyboard.generate_markup()
     bot.send_message(message.chat.id,
                      'Select relevant journals.\nP.S. I can only look in The '
                      'Lancet at the moment, but I promise to become more'
@@ -272,8 +273,9 @@ def search(message):
     @bot.callback_query_handler(func=lambda call: True
                                 and call.data != 'Continue')
     def _switch_button(call):
-        keyboard.switch_button(call.data)
-        new_markup = keyboard.generate_markup()
+        print(f'call data = {call.data}')
+        search_keyboard.switch_button(call.data)
+        new_markup = search_keyboard.generate_markup()
         bot.edit_message_reply_markup(call.message.chat.id,
                                       call.message.message_id,
                                       reply_markup=new_markup)
@@ -281,7 +283,7 @@ def search(message):
     @bot.callback_query_handler(func=lambda call: True
                                 and call.data == 'Continue')
     def _cont(call):
-        selected_journals = keyboard.selected_buttons()
+        selected_journals = search_keyboard.selected_buttons()
         if selected_journals:
             db.set_user_state(call.message.chat.id,
                               sts.S_SEARCH_JOURNALS.value)
@@ -358,8 +360,8 @@ def get_keywords(message):
                                'Saturday',
                                'Sunday']
 
-                keyboard = Keyboard(kbd_buttons, keyb_type='days')
-                markup = keyboard.generate_markup()
+                days_keyboard = Keyboard(kbd_buttons, keyb_type='days')
+                markup = days_keyboard.generate_markup()
                 bot.send_message(user_id,
                                  'Select delivery days',
                                  reply_markup=markup)
@@ -369,8 +371,8 @@ def get_keywords(message):
                                             and call.data != 'Continue')
                 def _switch_button(call):
                     day = call.data
-                    keyboard.switch_button(day)
-                    new_markup = keyboard.generate_markup()
+                    days_keyboard.switch_button(day)
+                    new_markup = days_keyboard.generate_markup()
                     bot.edit_message_reply_markup(user_id,
                                                   call.message.message_id,
                                                   reply_markup=new_markup)
@@ -378,7 +380,7 @@ def get_keywords(message):
                 @bot.callback_query_handler(func=lambda call: True
                                             and call.data == 'Continue')
                 def _cont(call):
-                    selected_days = keyboard.selected_buttons()
+                    selected_days = days_keyboard.selected_buttons()
                     if selected_days:
                         db.set_user_state(call.message.chat.id,
                                           sts.S_SUB_DAYS.value)
@@ -508,3 +510,5 @@ except KeyboardInterrupt:
 # mailing = broken
 
 # TODO: db would probably handle easier as a class.
+# TODO: /search with journals selected kills the bot.
+ 
