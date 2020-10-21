@@ -251,7 +251,7 @@ def get_keywords(message):
             keywords_type = 'SEARCH'
         elif user_state == config.States.S_SUB_TIME.value:
             keywords_type = 'SUB'
-        
+
         dbworker.set_user_terms(message.chat.id, strpd_text, keywords_type, 'KEYWORDS')
         bot.send_message(message.chat.id,
                         ('Nice! Now send me the names of the journals you want'
@@ -415,12 +415,7 @@ context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
 context.load_cert_chain(WEBHOOK_SSL_CERT, WEBHOOK_SSL_PRIV)
 # bot.infinity_polling()
 # Start aiohttp server
-web.run_app(
-    app,
-    host=WEBHOOK_LISTEN,
-    port=WEBHOOK_PORT,
-    ssl_context=context,
-)
+
 
 
 parsing_thread = threading.Thread(target=parser_lancet.check_updates, daemon=True)
@@ -428,7 +423,12 @@ job_keeper.every(6).hours.do(parsing_thread.start)
 
 running_keeper = job_keeper.run_continuously()
 try:
-    time.sleep(.1)
+    web.run_app(
+    app,
+    host=WEBHOOK_LISTEN,
+    port=WEBHOOK_PORT,
+    ssl_context=context,
+)
 except KeyboardInterrupt:
     running_keeper.set()
     parsing_thread.join()
