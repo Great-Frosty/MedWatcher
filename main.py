@@ -70,7 +70,9 @@ class JobRunner(schedule.Scheduler):
         continuous_thread.start()
         return cease_continuous_run
 
+
 job_keeper = JobRunner()
+
 
 # Chanhe days to buttons and it becomes a good abstract for journals too.
 class Keyboard(object):
@@ -138,19 +140,19 @@ def send_welcome(message):
 
         bot.send_message(message.chat.id,
                     ('Hi there, I am MedWatcher Bot.\n'
-                    'I follow several major medical journals and enjoy '
-                    'spreading the knowledge. Get it? Spread. '
-                    'Where was I? Right. '
-                    'Heres\'s what I can do for you.\n'
-                    'If you need a quick fix of science — just send me\n'
-                    '/search command.\n'
-                    'If you are more of a'
-                    ' \"constant stream of knowledge in my face\"'
-                    ' type of person — it\'s fine.\n'
-                    '/subscribe will hook you up.\n'
-                    '/unsub if you don\'t want to recieve articles'
-                    '/help\n might also come in handy, '
-                    'but you\'ve probaby figured that one out already...'))
+                     'I follow several major medical journals and enjoy '
+                     'spreading the knowledge. Get it? Spread. '
+                     'Where was I? Right. '
+                     'Heres\'s what I can do for you.\n'
+                     'If you need a quick fix of science — just send me\n'
+                     '/search command.\n'
+                     'If you are more of a'
+                     ' \"constant stream of knowledge in my face\"'
+                     ' type of person — it\'s fine.\n'
+                     '/subscribe will hook you up.\n'
+                     '/unsub if you don\'t want to recieve articles'
+                     '/help\n might also come in handy, '
+                     'but you\'ve probaby figured that one out already...'))
     else:
         dbworker.set_user_state(message.chat.id, config.States.S_START.value)
         bot.send_message(
@@ -432,7 +434,7 @@ try:
 except KeyboardInterrupt:
     running_keeper.set()
     parsing_thread.join()
-    print ("threads successfully closed")
+    print("threads successfully closed")
 
 #TODO: schedule mailing in a separate thread probably??? scheduling workks, mailing = broken
 #TODO: handle bad journals, comment out code, clean up if possible, properly schedule parser.
