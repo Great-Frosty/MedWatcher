@@ -89,7 +89,9 @@ class Keyboard(object):
 
     def __init__(self, key_names, keyb_type='day selection'):
         self.key_names = key_names
+        self.key_names = [*self.key_names, 'Select All']
         self.keyb_type = keyb_type
+        print(f'New keyboard:\n{self.key_names}')
 
     def generate_markup(self):
         self.markup = types.InlineKeyboardMarkup()
@@ -116,19 +118,18 @@ class Keyboard(object):
 
     def switch_button(self, text):
         """Marks button with passed [text] on/off, uses tick sign as a mark."""
-
-        key_number = self.key_names.index(text)
+        key_number = self.key_names.index(text.strip(self.tick))
 
         # This first clause checks if the key 'Select All'
         # was pressed. This key is last on the list of key names.
         if self.key_names[key_number] == self.key_names[-1]:
-            # This case handles the 'Select all' state.
-
+            # This case handles the 'Select All' state.
             if self.key_names[-1].startswith('Select'):
                 for i, text in enumerate(self.key_names[:-1]):
                     self.key_names[i] = text.strip(self.tick)
                     self.key_names[i] = self.key_names[i] + self.tick
                 self.key_names[-1] = 'Deselect All'
+            # This one is for 'Deselect All'.
             else:
                 for i, text in enumerate(self.key_names[:-1]):
                     self.key_names[i] = text.strip(self.tick)
@@ -183,11 +184,11 @@ def unsub(message):
     job_keeper.clear(message.chat.id)
     bot.send_message(message.chat.id,
                      'You\'re unsubbed. Hope we\'ll talk again:)')
+    db.set_user_state(message.chat.id, sts.S_START.value)
 
 
 @bot.message_handler(commands=['subscribe'])
 def subscribe(message):
-
     kbd_buttons = ['Lancet']
     keyboard = Keyboard(kbd_buttons, keyb_type='journals')
     markup = keyboard.generate_markup()
@@ -258,7 +259,6 @@ def get_time(message):
 
 @bot.message_handler(commands=['search'])
 def search(message):
-
     kbd_buttons = ['Lancet']
     keyboard = Keyboard(kbd_buttons, keyb_type='journals')
     markup = keyboard.generate_markup()
@@ -273,6 +273,7 @@ def search(message):
                                 and call.data != 'Continue')
     def _switch_button(call):
         journal = call.data
+        print(journal)
         keyboard.switch_button(journal)
         new_markup = keyboard.generate_markup()
         bot.edit_message_reply_markup(call.message.chat.id,
@@ -309,7 +310,7 @@ def get_keywords(message):
     strpd_text = message.text.strip(',;_\'"')
     user_id = message.chat.id
 
-    if not strpd_text.isalpha():
+    if not re.search('[a-z A-z]', strpd_text):
         bot.send_message(
                     user_id, 'Sorry, I won\'t be able to find those keywords, '
                              'try leaning more towards letters, not numbers.\n'
@@ -323,17 +324,13 @@ def get_keywords(message):
         keywords_type = ''
         if user_state == sts.S_SEARCH_JOURNALS.value:
             keywords_type = 'SEARCH'
-        elif user_state == sts.S_SUB_TIME.value:
+        elif user_state == sts.S_SUB_JOURNALS.value:
             keywords_type = 'SUB'
 
         db.set_user_terms(user_id,
-                          strpd_text, keywords_type, 'KEYWORDS')
-        bot.send_message(user_id,
-                         'Nice! Now select the names of the journals you want'
-                         ' me to look in. Sadly at moment I can only look for'
-                         ' things in one journal - "Lancet". But I promise to'
-                         ' become more diligent in the future. '
-                         )
+                          strpd_text,
+                          keywords_type,
+                          'KEYWORDS')
         next_state = f'sts.S_{keywords_type}_KEYWORDS.value'
         exec(f'db.set_user_state(user_id, {next_state})')
 
@@ -361,8 +358,7 @@ def get_keywords(message):
                                'Thursday',
                                'Friday',
                                'Saturday',
-                               'Sunday',
-                               'Select All']
+                               'Sunday']
 
                 keyboard = Keyboard(kbd_buttons, keyb_type='days')
                 markup = keyboard.generate_markup()
