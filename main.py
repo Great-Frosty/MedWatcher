@@ -309,7 +309,8 @@ def handle_random_message(message):
 # and it should be before keywords.
 # And the bot should talk less in general.
 @bot.message_handler(
-    func=lambda message: db.get_state(message.chat.id) == sts.S_SEARCH_KEYWORDS.value
+    func=lambda message: db.get_state(
+                        message.chat.id) == sts.S_SEARCH_KEYWORDS.value
     or db.get_state(message.chat.id) == sts.S_SUB_KEYWORDS.value
     and message.text.strip().lower() not in ('/search', '/subscribe',
                                              '/help', '/unsub'))
