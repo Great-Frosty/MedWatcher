@@ -310,7 +310,7 @@ def set_keyboard(user_id, keyb_type, req_type, callback):
         if req_type == 'search':
             conn.execute('''UPDATE user_keyboards
                             SET lanc_search = 1
-                            WHERE id = ?''', (user_id))        
+                            WHERE id = ?''', (user_id))
 
     conn.commit()
     conn.close()
@@ -334,7 +334,13 @@ def get_keyboard(user_id, keyb_type, req_type):
             return output
 
         if keyb_type == 'days':
-            curs = conn.execute('''SELECT monday, tuesday, wednesday, thursday, friday, saturday, sunday
+            curs = conn.execute('''SELECT monday,
+                                          tuesday,
+                                          wednesday,
+                                          thursday,
+                                          friday,
+                                          saturday,
+                                          sunday
                             FROM user_keyboards''')
             output = curs.fetchall()
 

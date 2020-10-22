@@ -100,8 +100,9 @@ class Keyboard(object):
     def generate_markup(self):
 
         self.markup = types.InlineKeyboardMarkup()
-        self.keys = [types.InlineKeyboardButton(text=day,
-                                                callback_data=day) for day in self.days]
+        self.keys = [types.InlineKeyboardButton(
+                            text=day,
+                            callback_data=day) for day in self.days]
         self.cont_key = types.InlineKeyboardButton(text='Continue',
                                                    callback_data='Continue')
         self.markup.row(*self.keys[:4])
@@ -185,7 +186,8 @@ def subscribe(message):
 
     # Starting a function name with an underscore disables "Unused variable"
     # warnings. Thank you, stackoverflow!
-    @bot.callback_query_handler(func=lambda call: True and call.data != 'Continue')
+    @bot.callback_query_handler(func=lambda call: True
+                                and call.data != 'Continue')
     def _switch_button(call):
         day = call.data
         keyboard.switch_button(day)
@@ -194,7 +196,8 @@ def subscribe(message):
                                       call.message.message_id,
                                       reply_markup=new_markup)
 
-    @bot.callback_query_handler(func=lambda call: True and call.data == 'Continue')
+    @bot.callback_query_handler(func=lambda call: True
+                                and call.data == 'Continue')
     def _cont(call):
         selected_days = keyboard.selected_days()
         if selected_days:
@@ -251,8 +254,9 @@ def search(message):
 @bot.message_handler(
     func=lambda message: db.get_state(message.chat.id) == sts.S_SEARCH.value
     or db.get_state(message.chat.id) == sts.S_SUB_TIME.value
-    and message.text.strip().lower() not in ('/search', '/subscribe', '/help', '/unsub')
-    )
+    and message.text.strip().lower() not in ('/search', '/subscribe',
+                                             '/help', '/unsub')
+                     )
 def get_keywords(message):
     strpd_text = message.text.strip(',;_\'"')
 
@@ -263,7 +267,7 @@ def get_keywords(message):
                              'For example: instead of "covid-19 try "covid".\n'
                              'If you\'re somehow stuck - just do a new /search'
                              ' or even /start, I promise, I will still '
-                             ' remember you.' 
+                             ' remember you.'
         )
     else:
         user_state = db.get_state(message.chat.id)
@@ -273,12 +277,13 @@ def get_keywords(message):
         elif user_state == sts.S_SUB_TIME.value:
             keywords_type = 'SUB'
 
-        db.set_user_terms(message.chat.id, strpd_text, keywords_type, 'KEYWORDS')
+        db.set_user_terms(message.chat.id, strpd_text,
+                          keywords_type, 'KEYWORDS')
         bot.send_message(message.chat.id,
-                        'Nice! Now send me the names of the journals you want'
-                        ' me to search in. Sadly at moment I can only look for'
-                        ' things in one journal - \'Lancet\'. But I promise to '
-                        'become more diligent in the future. ')
+                         'Nice! Now send me the names of the journals you want'
+                         ' me to search in. Sadly at moment I can only '
+                         'look for things in one journal - \'Lancet\'. But I '
+                         'promise to become more diligent in the future. ')
 
         next_state = f'sts.S_{keywords_type}_KEYWORDS.value'
         exec(f'db.set_user_state(message.chat.id, {next_state})')
@@ -305,56 +310,58 @@ def handle_random_message(message):
 # And the bot should talk less in general.
 @bot.message_handler(
     func=lambda message: db.get_state(message.chat.id) == sts.S_SEARCH_KEYWORDS.value
-    or db.get_state(message.chat.id) == sts.S_SUB_KEYWORDS.value 
-    and message.text.strip().lower() not in ('/search', '/subscribe', '/help', '/unsub'))
+    or db.get_state(message.chat.id) == sts.S_SUB_KEYWORDS.value
+    and message.text.strip().lower() not in ('/search', '/subscribe',
+                                             '/help', '/unsub'))
 def get_journals(message):
     strpd_text = message.text.strip(',;_\'"').lower()
-
+    user_id = message.chat.id
     if strpd_text not in ['lancet']:
         if not re.search('[a-zA-z]', strpd_text):
-            bot.send_message(
-                message.chat.id, 'I\'m pretty sure no journal in the world is '
+            bot.send_message(user_id,
+                             'I\'m pretty sure no journal in the world is '
                              'named like that. A letter is worth a thousand '
                              'numbers in this case.\n'
                              'If you\'re somehow stuck - just do a new /search'
                              ' or even /start, I promise, I will still '
-                             ' remember you.'
-                            )
+                             ' remember you.')
         else:
-            bot.send_message(message.chat.id, 'Cmon man, just type in "lancet"')
+            bot.send_message(user_id, 'Cmon man, just type in "lancet"')
     else:
-        user_state = db.get_state(message.chat.id)
+        user_state = db.get_state(user_id)
         keywords_type = ''
         if user_state == sts.S_SEARCH_KEYWORDS.value:
             keywords_type = 'SEARCH'
         elif user_state == sts.S_SUB_KEYWORDS.value:
             keywords_type = 'SUB'
 
-        db.set_user_terms(message.chat.id, strpd_text, keywords_type, 'JOURNALS')
+        db.set_user_terms(user_id, strpd_text, keywords_type, 'JOURNALS')
         next_state = f'sts.S_{keywords_type}_JOURNALS.value'
-        exec(f'db.set_user_state(message.chat.id, {next_state})')
+        exec(f'db.set_user_state(user_id, {next_state})')
 
-        if db.get_state(message.chat.id) == sts.S_SEARCH_JOURNALS.value:
-            collected_articles = collect_articles(message.chat.id, keywords_type)
-            send_articles(message.chat.id, collected_articles, keywords_type)
-            db.set_user_state(message.chat.id, sts.S_START.value)
+        if db.get_state(user_id) == sts.S_SEARCH_JOURNALS.value:
+            collected_articles = collect_articles(user_id,
+                                                  keywords_type)
+            send_articles(user_id, collected_articles, keywords_type)
+            db.set_user_state(user_id, sts.S_START.value)
 
-        elif db.get_state(message.chat.id) == sts.S_SUB_JOURNALS.value:
-            user_keywords = db.get_keywords(message.chat.id, 'SUB').split()
-            user_journals = db.get_journals(message.chat.id, 'SUB').split()
+        elif db.get_state(user_id) == sts.S_SUB_JOURNALS.value:
+            user_keywords = db.get_keywords(user_id, 'SUB').split()
+            user_journals = db.get_journals(user_id, 'SUB').split()
 
-            collected_data = db.articles_by_keywords(user_keywords, user_journals)
+            collected_data = db.articles_by_keywords(user_keywords,
+                                                     user_journals)
             if not collected_data:
-                bot.send_message(message.chat.id, 'Fair warning:\nI have no  '
-                                                'matches with those keywords'
-                                                ' in my archive. Your '
-                                                'subscription probably won\'t'
-                                                'yield any results.')
+                bot.send_message(user_id, 'Fair warning:\nI have no  '
+                                          'matches with those keywords'
+                                          ' in my archive. Your '
+                                          'subscription probably won\'t'
+                                          'yield any results.')
             else:
-                schedule_job(message.chat.id)
-                bot.send_message(message.chat.id, 'Great! You have '
-                                                  'successfully subscribed!')
-                db.set_user_state(message.chat.id, sts.S_START.value)
+                schedule_job(user_id)
+                bot.send_message(user_id, 'Great! You have '
+                                          'successfully subscribed!')
+                db.set_user_state(user_id, sts.S_START.value)
 
 
 def collect_articles(user_id, op_type):
@@ -457,7 +464,6 @@ except KeyboardInterrupt:
     print("threads successfully closed")
 
 # TODO: schedule mailing in a separate thread probably??? scheduling workks,
-# mailing = broken
 
 # TODO: db would probably handle easier as a class.
 # TODO: /search with journals selected kills the bot.
