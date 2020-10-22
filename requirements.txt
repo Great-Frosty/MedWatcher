@@ -41,6 +41,7 @@ pytz==2020.1
 pywin32==227
 pyzmq==19.0.2
 requests==2.24.0
+schedule==0.6.0
 six==1.15.0
 snowballstemmer==2.0.0
 soupsieve==2.0.1
@@ -49,7 +50,6 @@ tornado==6.0.4
 traitlets==5.0.4
 urllib3==1.25.10
 wcwidth==0.2.5
-wheel==0.35.1
 win-inet-pton==1.1.0
 wincertstore==0.2
 wrapt==1.11.2
